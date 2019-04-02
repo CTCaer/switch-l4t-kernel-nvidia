@@ -31,14 +31,15 @@ EXPORT_SYMBOL(nvhost_interrupt_syncpt_get_syncpt_index);
 phys_addr_t nvhost_interrupt_syncpt_get_syncpt_addr(
     struct nvhost_interrupt_syncpt *is)
 {
-    phys_addr_t base;
-    size_t size;
-    u32 offset;
+       return 0;
+    //phys_addr_t base;
+    //size_t size;
+    //u32 offset;
 
-    nvhost_syncpt_unit_interface_get_aperture(is->host1x_pdev, &base, &size);
-    offset = nvhost_syncpt_unit_interface_get_byte_offset(is->syncpt);
+    //nvhost_syncpt_unit_interface_get_aperture(is->host1x_pdev, &base, &size);
+    //offset = nvhost_syncpt_unit_interface_get_byte_offset(is->syncpt);
 
-    return base + offset;
+    //return base + offset;
 }
 EXPORT_SYMBOL(nvhost_interrupt_syncpt_get_syncpt_addr);
 
