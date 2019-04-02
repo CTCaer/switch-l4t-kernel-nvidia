@@ -50,28 +50,6 @@ unsigned long dram_app_mem_get_address(void *handle)
 	return mem_get_address(handle);
 }
 
-#ifdef CONFIG_DEBUG_FS
-static struct dentry *dram_app_mem_dump_debugfs_file;
-
-static int dram_app_mem_dump(struct seq_file *s, void *data)
-{
-	mem_dump(dram_app_mem_handle, s);
-	return 0;
-}
-
-static int dram_app_mem_dump_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, dram_app_mem_dump, inode->i_private);
-}
-
-static const struct file_operations dram_app_mem_dump_fops = {
-	.open		= dram_app_mem_dump_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= single_release,
-};
-#endif
-
 int dram_app_mem_init(unsigned long start, unsigned long size)
 {
 	dram_app_mem_handle =
@@ -81,24 +59,11 @@ int dram_app_mem_init(unsigned long start, unsigned long size)
 		return PTR_ERR(dram_app_mem_handle);
 	}
 
-#ifdef CONFIG_DEBUG_FS
-	dram_app_mem_dump_debugfs_file =
-		debugfs_create_file("dram_app_mem_dump",
-				S_IRUSR, NULL, NULL, &dram_app_mem_dump_fops);
-	if (!dram_app_mem_dump_debugfs_file) {
-		pr_err("ERROR: failed to create dram_app_mem_dump debugfs");
-		destroy_mem_manager(dram_app_mem_handle);
-		return -ENOMEM;
-	}
-#endif
 	return 0;
 }
 
 void dram_app_mem_exit(void)
 {
-#ifdef CONFIG_DEBUG_FS
-	debugfs_remove(dram_app_mem_dump_debugfs_file);
-#endif
 	destroy_mem_manager(dram_app_mem_handle);
 }
 
