@@ -1,5 +1,4 @@
 GCOV_PROFILE := y
-subdir-ccflags-y := -Werror
 ccflags-y += -I$(overlay)/drivers/video/tegra/host
 ccflags-y += -I$(overlay)/drivers/video/tegra/dc
 ccflags-y += -I$(overlay)/drivers/platform/tegra
@@ -50,7 +49,6 @@ obj-$(CONFIG_TEGRA_CEC_SUPPORT) += ../../../misc/tegra-cec/
 obj-y += crc.o
 
 GCOV_PROFILE := y
-subdir-ccflags-y := -Werror
 ccflags-y += -I$(srctree.nvidia)/drivers/video/tegra/dc
 ccflags-y += -I$(srctree.nvidia)/drivers/video/tegra/dc/nvdisp
 
