@@ -32,6 +32,7 @@
 #include <sound/soc.h>
 #include <dt-bindings/sound/tas2552.h>
 #include "rt5659.h"
+#include "rt5640.h"
 #include "tegra_asoc_utils_alt.h"
 #include "tegra_asoc_machine_alt.h"
 #include "tegra210_xbar_alt.h"
@@ -293,6 +294,13 @@ static struct snd_soc_card snd_soc_tegra_card = {
 	.num_dapm_widgets = ARRAY_SIZE(tegra_machine_dapm_widgets),
 	.suspend_pre = tegra_machine_suspend_pre,
 	.fully_routed = true,
+};
+
+static struct snd_soc_jack_pin tegra_machine_hp_jack_pins[] = {
+	{
+		.pin = "x Headphone Jack",
+		.mask = SND_JACK_HEADSET,
+	},
 };
 
 static struct snd_soc_pcm_stream tegra_machine_asrc_link_params[] = {
@@ -801,7 +809,7 @@ static int tegra_machine_rt565x_init(struct snd_soc_pcm_runtime *rtd)
 		return -ENOMEM;
 
 	err = snd_soc_card_jack_new(card, "Headset Jack", SND_JACK_HEADSET,
-				    jack, NULL, 0);
+				    jack, tegra_machine_hp_jack_pins, 1);
 	if (err) {
 		dev_err(card->dev, "Headset Jack creation failed %d\n", err);
 		return err;
@@ -813,7 +821,7 @@ static int tegra_machine_rt565x_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	err = rt5659_set_jack_detect(rtd->codec, jack);
+	err = rt5640_set_jack(rtd->codec, jack);
 	if (err) {
 		dev_err(card->dev, "Failed to set jack for RT565x: %d\n", err);
 		return err;
