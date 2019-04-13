@@ -749,6 +749,31 @@ static ssize_t fan_pwm_state_map_store(struct device *dev,
 	return count;
 }
 
+static ssize_t fan_profiles_show(struct device *dev,
+							   struct device_attribute *da,
+							   char *buf)
+{
+	struct fan_dev_data *fan_data = dev_get_drvdata(dev);
+	ssize_t total_len = 0;
+	int j;
+
+	for (j = 0; j < fan_data->num_profiles; j++) {
+		if (j == fan_data->num_profiles - 1)
+			total_len += snprintf(buf + total_len,
+								  PAGE_SIZE,
+								   "%s",
+								   fan_data->fan_profile_names[j]);
+		else
+			total_len += snprintf(buf + total_len,
+								  PAGE_SIZE,
+								   "%s ",
+								   fan_data->fan_profile_names[j]);
+
+   }
+   total_len += snprintf(buf + total_len, PAGE_SIZE, "\n");
+   return strlen(buf);
+}
+
 static DEVICE_ATTR(pwm_cap, S_IWUSR | S_IRUGO,
 			fan_pwm_cap_show,
 			fan_pwm_cap_store);
@@ -782,9 +807,13 @@ static DEVICE_ATTR(pwm_rpm_table, S_IRUGO,
 static DEVICE_ATTR(fan_profile, S_IWUSR | S_IRUGO,
 			fan_profile_show,
 			fan_profile_store);
+static DEVICE_ATTR(fan_profiles, S_IRUGO,
+			fan_profiles_show,
+			NULL);
 
 static struct attribute *pwm_fan_attributes[] = {
 	&dev_attr_fan_profile.attr,
+	&dev_attr_fan_profiles.attr,
 	&dev_attr_pwm_cap.attr,
 	&dev_attr_state_cap.attr,
 	&dev_attr_pwm_state_map.attr,
@@ -932,7 +961,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	if (of_property_read_u32(data_node, "pwm_polarity", &value))
 		fan_data->fan_pwm_polarity = PWM_POLARITY_INVERSED;
 	else if (value > PWM_POLARITY_INVERSED) {
-		dev_warn(&pdev->dev, "invalid polarity, use inversed by default\n");
+		pr_info("FAN: invalid polarity, use inversed by default\n");
 		fan_data->fan_pwm_polarity = PWM_POLARITY_INVERSED;
 	} else
 		fan_data->fan_pwm_polarity = value;
@@ -1001,7 +1030,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			of_err |= of_property_read_string(profile_node, "name",
 					&fan_data->fan_profile_names[i]);
 			if (default_profile &&
-					!strncmp(default_profile,
+						!strncmp(default_profile,
 					fan_data->fan_profile_names[i], MAX_PROFILE_NAME_LENGTH)) {
 				fan_data->current_profile = i;
 			}
