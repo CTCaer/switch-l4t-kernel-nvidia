@@ -61,6 +61,34 @@ struct tegra_cpufreq_priv {
 };
 static struct tegra_cpufreq_priv *tfreq_priv;
 
+static struct kobject *cpufreq_kobject;
+static bool overclock_enabled = false;
+static unsigned int default_max_freq = 0;
+
+static ssize_t overclock_show(struct kobject *kobj, struct kobj_attribute *attr,
+					   char *buf)
+{
+	return sprintf(buf, "%d\n", overclock_enabled);
+}
+
+static ssize_t overclock_store(struct kobject *kobj, struct kobj_attribute *attr,
+						const char *buf, size_t count)
+{
+	int enable, ret;
+
+	ret = sscanf(buf, "%d", &enable);
+	if (ret != 1 || enable < 0 || enable > 1)
+		return -EINVAL;
+	
+	overclock_enabled = enable;
+
+	return count;
+}
+
+
+static struct kobj_attribute overclock_attribute = __ATTR(overclock, 0660, overclock_show,
+														  overclock_store);
+
 static int cpu_freq_notify(struct notifier_block *b,
 			   unsigned long l, void *v)
 {
@@ -106,6 +134,9 @@ static int tegra_boundaries_policy_notifier(struct notifier_block *nb,
 	/* Apply pmqos limits on top of existing limits */
 	policy->min = max(policy->min, qmin);
 	policy->max = min(policy->max, qmax);
+
+	if (!overclock_enabled)
+		policy->max = min(default_max_freq, policy->max);
 
 	if (policy->min > policy->max)
 		policy->min = policy->max;
@@ -249,6 +280,17 @@ static int cpufreq_table_make_from_dt(void)
 		dev_err(dev, "%s: failed to read %s\n", __func__, propname);
 		ret = -EINVAL;
 		goto err_out;
+	}
+
+	if (!of_property_read_u32(np, "default-max-frequency", &default_max_freq)) {
+		cpufreq_kobject = kobject_create_and_add("tegra_cpufreq",
+							 kernel_kobj);
+		if(!cpufreq_kobject)
+			return -ENOMEM;
+
+		ret = sysfs_create_file(cpufreq_kobject, &overclock_attribute.attr);
+		if (ret)
+			return -ENOMEM;	
 	}
 
 	if (WARN_ON(freqs_num >= CPU_FREQ_TABLE_MAX_SIZE)) {
@@ -457,6 +499,7 @@ static int tegra_cpufreq_probe(struct platform_device *pdev)
 	if (!tfreq_priv)
 		return -ENOMEM;
 
+
 	platform_set_drvdata(pdev, tfreq_priv);
 	tfreq_priv->pdev = pdev;
 
@@ -491,6 +534,9 @@ err_out:
 static int tegra_cpufreq_remove(struct platform_device *pdev)
 {
 	struct tegra_cpufreq_priv *priv = platform_get_drvdata(pdev);
+
+	if (cpufreq_kobject)
+		kobject_put(cpufreq_kobject);
 
 	cpufreq_unregister_notifier(&tegra_boundaries_cpufreq_nb,
 					CPUFREQ_POLICY_NOTIFIER);
