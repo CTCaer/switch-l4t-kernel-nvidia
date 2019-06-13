@@ -2116,8 +2116,8 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 		snprintf(dp->audio_switch_name, CHAR_BUF_SIZE_MAX,
 			"dp%d_audio", dp_instance);
 	} else {
-		snprintf(dp->hpd_switch_name, CHAR_BUF_SIZE_MAX, "dp");
-		snprintf(dp->audio_switch_name, CHAR_BUF_SIZE_MAX, "dp_audio");
+		snprintf(dp->hpd_switch_name, CHAR_BUF_SIZE_MAX, "hdmi");
+		snprintf(dp->audio_switch_name, CHAR_BUF_SIZE_MAX, "hdmi_audio");
 	}
 #ifdef CONFIG_SWITCH
 	dp->hpd_data.hpd_switch.name = dp->hpd_switch_name;
