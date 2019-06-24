@@ -473,6 +473,9 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 			 unsigned long count)
 {
 	ssize_t copied = 0;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+	void *tmp = NULL;
+#endif
 	void *addr;
 	int ret = 0;
 
@@ -508,6 +511,15 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 
 	addr = h->vaddr + h_offs;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+	/* Allocate buffer to cache data for VPR write */
+	if (!is_read && h->heap_type == NVMAP_HEAP_CARVEOUT_VPR) {
+		tmp = vmalloc(elem_size);
+		if (!tmp)
+			return -ENOMEM;
+	}
+#endif
+
 	while (count--) {
 		if (h_offs + elem_size > h->size) {
 			pr_warn("read/write outside of handle\n");
@@ -524,10 +536,10 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 		else {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 			if (h->heap_type == NVMAP_HEAP_CARVEOUT_VPR) {
-				uaccess_enable();
-				memcpy_toio(addr, (void *)sys_addr, elem_size);
-				uaccess_disable();
-				ret = 0;
+				ret = copy_from_user(tmp, (void *)sys_addr,
+						     elem_size);
+				if (!ret)
+					memcpy_toio(addr, tmp, elem_size);
 			} else
 #endif
 				ret = copy_from_user(addr, (void *)sys_addr, elem_size);
@@ -547,6 +559,12 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 		h_offs += h_stride;
 		addr += h_stride;
 	}
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
+	/* Release the buffer used for VPR write */
+	if (!is_read && h->heap_type == NVMAP_HEAP_CARVEOUT_VPR && tmp)
+		vfree(tmp);
+#endif
 
 	return ret ?: copied;
 }
