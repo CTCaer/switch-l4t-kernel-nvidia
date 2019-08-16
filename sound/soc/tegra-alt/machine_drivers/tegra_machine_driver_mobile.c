@@ -32,6 +32,7 @@
 #include <sound/soc.h>
 #include <dt-bindings/sound/tas2552.h>
 #include "rt5659.h"
+#include "rt5640.h"
 #include "sgtl5000.h"
 #include "tegra_asoc_utils_alt.h"
 #include "tegra_asoc_machine_alt.h"
@@ -826,10 +827,10 @@ static int tegra_machine_rt565x_init(struct snd_soc_pcm_runtime *rtd)
 	if (!jack)
 		return -ENOMEM;
 
-	err = snd_soc_card_jack_new(card, "Headset Jack", SND_JACK_HEADSET,
+	err = snd_soc_card_jack_new(card, "Headphone Jack", SND_JACK_HEADPHONE,
 				    jack, NULL, 0);
 	if (err) {
-		dev_err(card->dev, "Headset Jack creation failed %d\n", err);
+		dev_err(card->dev, "Headphone Jack creation failed %d\n", err);
 		return err;
 	}
 
@@ -839,9 +840,9 @@ static int tegra_machine_rt565x_init(struct snd_soc_pcm_runtime *rtd)
 		return err;
 	}
 
-	err = rt5659_set_jack_detect(rtd->codec, jack);
+	err = rt5640_set_jack(rtd->codec, jack);
 	if (err) {
-		dev_err(card->dev, "Failed to set jack for RT565x: %d\n", err);
+		dev_err(card->dev, "Failed to set jack for RT5640: %d\n", err);
 		return err;
 	}
 
