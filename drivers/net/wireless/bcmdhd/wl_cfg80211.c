@@ -15116,6 +15116,10 @@ wl_cfg80211_ch_switch_notify(struct net_device *dev, uint16 chanspec, struct wip
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0))
 	struct cfg80211_chan_def chandef;
+	struct wlc_ssid *ssid = NULL;
+	u8 *bssid = 0;
+	struct cfg80211_bss *bss = NULL;
+	struct bcm_cfg80211 *cfg = NULL;
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 5, 0) && (LINUX_VERSION_CODE <= (3, 7, \
 	\
 	0)))
@@ -15144,6 +15148,24 @@ wl_cfg80211_ch_switch_notify(struct net_device *dev, uint16 chanspec, struct wip
 	0)))
 	cfg80211_ch_switch_notify(dev, chan_info.freq, chan_info.chan_type);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0)) */
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0))
+	/* Update cfg80211 BSS Channel */
+	cfg = wiphy_priv(wiphy);
+	if (!cfg)
+		return;
+	ssid = (struct wlc_ssid *)wl_read_prof(cfg, dev, WL_PROF_SSID);
+	bssid = (u8 *)wl_read_prof(cfg, dev, WL_PROF_BSSID);
+	if (ssid && bssid) {
+		bss = CFG80211_GET_BSS(wiphy, NULL, bssid,
+			ssid->SSID, ssid->SSID_len);
+		if (bss) {
+			bss->channel = chandef.chan;
+			CFG80211_PUT_BSS(wiphy, bss);
+		}
+	}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0)) */
+
 	return;
 }
 
