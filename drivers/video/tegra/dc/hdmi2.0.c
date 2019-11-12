@@ -1669,6 +1669,9 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 
 	tegra_hdmi_hdr_init(hdmi);
 
+	hdmi->dv_override.avi_quant_override = AVI_QUANT_OVERRIDE_NONE;
+	hdmi->dv_override.avi_quant_override_dirty = false;
+
 	if (hdmi->pdata->hdmi2fpd_bridge_enable) {
 		hdmi2fpd_init(dc);
 		hdmi2fpd_enable(dc);
@@ -2145,6 +2148,7 @@ static u32 tegra_hdmi_get_ycc_quant(struct tegra_hdmi *hdmi)
 static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 {
 	struct hdmi_avi_infoframe *avi = &hdmi->avi;
+	struct dv_override_info *dv_override = &hdmi->dv_override;
 
 	memset(&hdmi->avi, 0, sizeof(hdmi->avi));
 
@@ -2152,6 +2156,24 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 	avi->bar_valid = HDMI_AVI_BAR_INVALID;
 	avi->act_fmt_valid = HDMI_AVI_ACTIVE_FORMAT_INVALID;
 	avi->rgb_ycc = tegra_hdmi_get_rgb_ycc(hdmi);
+
+	switch (hdmi->avi_color_components) {
+	case TEGRA_DC_EXT_AVI_COLOR_COMPONENTS_RGB:
+		avi->rgb_ycc = HDMI_AVI_RGB;
+		break;
+	case TEGRA_DC_EXT_AVI_COLOR_COMPONENTS_YUV422:
+		avi->rgb_ycc = HDMI_AVI_YCC_422;
+		break;
+	case TEGRA_DC_EXT_AVI_COLOR_COMPONENTS_YUV444:
+		avi->rgb_ycc = HDMI_AVI_YCC_444;
+		break;
+	case TEGRA_DC_EXT_AVI_COLOR_COMPONENTS_YUV420:
+		avi->rgb_ycc = HDMI_AVI_YCC_420;
+		break;
+	default:
+		/* Let default value as it is.*/
+		break;
+	}
 
 	avi->act_format = HDMI_AVI_ACTIVE_FORMAT_SAME;
 	avi->aspect_ratio = tegra_hdmi_get_aspect_ratio(hdmi);
@@ -2214,6 +2236,27 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 
 	avi->right_bar_start_pixel_low_byte = 0;
 	avi->right_bar_start_pixel_high_byte = 0;
+
+	/*
+	 * Apply Dolby Vision overrides
+	 */
+	switch (dv_override->avi_quant_override) {
+	case AVI_QUANT_OVERRIDE_LIMITED:
+		if (avi->rgb_ycc == HDMI_AVI_RGB)
+			avi->rgb_quant = HDMI_AVI_RGB_QUANT_LIMITED;
+		else
+			avi->ycc_quant = HDMI_AVI_YCC_QUANT_LIMITED;
+		break;
+	case AVI_QUANT_OVERRIDE_FULL:
+		if (avi->rgb_ycc == HDMI_AVI_RGB)
+			avi->rgb_quant = HDMI_AVI_RGB_QUANT_FULL;
+		else
+			avi->ycc_quant = HDMI_AVI_YCC_QUANT_FULL;
+		break;
+	default:
+		/* No override. */
+		break;
+	}
 }
 
 static void tegra_hdmi_avi_infoframe(struct tegra_hdmi *hdmi)
@@ -2248,9 +2291,13 @@ static int tegra_dc_hdmi_set_avi(struct tegra_dc *dc, struct tegra_dc_ext_avi *a
 {
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
 
-	hdmi->avi_colorimetry = avi->avi_colorimetry;
-	/* Setting AVI infoframe externally */
-	tegra_hdmi_avi_infoframe(hdmi);
+	if (hdmi->avi_colorimetry != avi->avi_colorimetry ||
+	    hdmi->avi_color_components != avi->avi_color_components) {
+		hdmi->avi_colorimetry = avi->avi_colorimetry;
+		hdmi->avi_color_components = avi->avi_color_components;
+		/* Setting AVI infoframe externally */
+		tegra_hdmi_avi_infoframe(hdmi);
+	}
 
 	return 0;
 }
@@ -2300,11 +2347,8 @@ static void tegra_hdmi_vendor_infoframe_update(struct tegra_hdmi *hdmi)
 	}
 }
 
-static void tegra_hdmi_vendor_infoframe(struct tegra_hdmi *hdmi)
+static void tegra_hdmi_vendor_infoframe(struct tegra_hdmi *hdmi, u8 length)
 {
-/* hdmi licensing, LLC vsi playload len as per hdmi1.4b  */
-#define HDMI_INFOFRAME_LEN_VENDOR_LLC	(6)
-
 	struct tegra_dc_sor_data *sor = hdmi->sor;
 
 	if (hdmi->dvi)
@@ -2318,7 +2362,7 @@ static void tegra_hdmi_vendor_infoframe(struct tegra_hdmi *hdmi)
 	tegra_hdmi_infoframe_pkt_write(hdmi, NV_SOR_HDMI_VSI_INFOFRAME_HEADER,
 					HDMI_INFOFRAME_TYPE_VENDOR,
 					HDMI_INFOFRAME_VS_VENDOR,
-					HDMI_INFOFRAME_LEN_VENDOR_LLC,
+					length,
 					&hdmi->vsi, sizeof(hdmi->vsi),
 					false);
 
@@ -2328,8 +2372,126 @@ static void tegra_hdmi_vendor_infoframe(struct tegra_hdmi *hdmi)
 		NV_SOR_HDMI_VSI_INFOFRAME_CTRL_OTHER_DISABLE |
 		NV_SOR_HDMI_VSI_INFOFRAME_CTRL_SINGLE_DISABLE |
 		NV_SOR_HDMI_VSI_INFOFRAME_CTRL_CHECKSUM_ENABLE);
+}
 
-#undef HDMI_INFOFRAME_LEN_VENDOR_LLC
+static void tegra_hdmi_dv_infoframe_update(struct tegra_hdmi *hdmi)
+{
+	struct hdmi_dv_infoframe *dv = &hdmi->dv;
+
+	memset(&hdmi->dv, 0, sizeof(hdmi->dv));
+
+	/* PB1 - PB3 */
+	dv->oui = DV_IEEE_LLC_OUI;
+
+	/* PB4 */
+	if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_NONE)
+		dv->dolby_vision_signal = 0;
+	else
+		dv->dolby_vision_signal = 1;
+
+	if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_LOW_LATENCY)
+		dv->low_latency = 1;
+	else
+		dv->low_latency = 0;
+
+	dv->res1 = 0;
+
+	/* PB5 */
+	dv->eff_tmax_pq_high = 0;
+	dv->res2 = 0;
+	dv->auxilary_md_present = 0;
+	dv->backlight_ctrl_md_present = 0;
+
+	/* PB6 */
+	dv->eff_tmax_pq_low = 0;
+
+	/* PB7 */
+	dv->auxilary_run_mode = 0;
+
+	/* PB8 */
+	dv->auxilary_run_version = 0;
+
+	/* PB9 */
+	dv->auxilary_debug = 0;
+}
+
+static void tegra_hdmi_dv_update_overrides(struct tegra_hdmi *hdmi)
+{
+	struct dv_override_info *override = &hdmi->dv_override;
+
+	if (hdmi->dvi)
+		return;
+
+	if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_NONE) {
+		/* Turn off all overrides */
+		if (override->avi_quant_override != AVI_QUANT_OVERRIDE_NONE) {
+			override->avi_quant_override = AVI_QUANT_OVERRIDE_NONE;
+			override->avi_quant_override_dirty = true;
+		}
+	} else if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_STANDARD) {
+		/*
+		 * Dolby Vision Standard mandates to signal full range
+		 * quantization.
+		 */
+		if (override->avi_quant_override == AVI_QUANT_OVERRIDE_NONE) {
+			override->avi_quant_override = AVI_QUANT_OVERRIDE_FULL;
+			override->avi_quant_override_dirty = true;
+		}
+	} else {
+		/*
+		 * Dolby Vision Low-latency mandates limited range
+		 * quantization.
+		 */
+		if (override->avi_quant_override == AVI_QUANT_OVERRIDE_NONE) {
+			override->avi_quant_override = AVI_QUANT_OVERRIDE_LIMITED;
+			override->avi_quant_override_dirty = true;
+		}
+	}
+}
+
+static void tegra_hdmi_dv_infoframe(struct tegra_hdmi *hdmi)
+{
+	struct tegra_dc_sor_data *sor = hdmi->sor;
+
+	tegra_hdmi_dv_update_overrides(hdmi);
+
+	/* disable/stop vsi/dv infoframe before configuring */
+	tegra_sor_writel(sor, NV_SOR_HDMI_VSI_INFOFRAME_CTRL, 0);
+
+	if (tegra_edid_require_dv_vsif(hdmi->edid)) {
+		/*
+		 * Dolby Vision VSVDB v1, 12-byte with low-latency
+		 * support and VSVDB v2 require Dolby VSIF to be
+		 * send continuously.
+		 */
+		tegra_hdmi_dv_infoframe_update(hdmi);
+
+		tegra_hdmi_infoframe_pkt_write(hdmi,
+			NV_SOR_HDMI_VSI_INFOFRAME_HEADER,
+			HDMI_INFOFRAME_TYPE_DV,
+			HDMI_INFOFRAME_VS_DV,
+			HDMI_INFOFRAME_LEN_DV,
+			&hdmi->dv, sizeof(hdmi->dv),
+			false);
+
+		/* Send infoframe every frame, checksum hw generated */
+		tegra_sor_writel(sor, NV_SOR_HDMI_VSI_INFOFRAME_CTRL,
+			NV_SOR_HDMI_VSI_INFOFRAME_CTRL_ENABLE_YES |
+			NV_SOR_HDMI_VSI_INFOFRAME_CTRL_OTHER_DISABLE |
+			NV_SOR_HDMI_VSI_INFOFRAME_CTRL_SINGLE_DISABLE |
+			NV_SOR_HDMI_VSI_INFOFRAME_CTRL_CHECKSUM_ENABLE);
+	} else {
+		/*
+		 * Dolby Vision VSVDB v0, v1-15 byte, and v1-12 byte without
+		 * low-latency support need HDMI 1.4b VSIF length 24 to be
+		 * send continuously. If DV signal is turned off then send
+		 * normal LLC length VSIF.
+		 */
+		tegra_hdmi_vendor_infoframe(hdmi,
+			hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_NONE ?
+			HDMI_INFOFRAME_LEN_VENDOR_LLC :
+			HDMI_INFOFRAME_LEN_VENDOR_DV);
+	}
 }
 
 static void tegra_hdmi_hdr_infoframe_update(struct tegra_hdmi *hdmi)
@@ -2775,12 +2937,17 @@ static bool tegra_hdmi_gcp_default_phase_en(struct tegra_hdmi *hdmi)
 }
 
 /* general control packet */
-static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi)
+static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi, bool update_mute,
+			   bool mute)
 {
 #define GCP_SB1_PP_SHIFT 4
 
 	struct tegra_dc_sor_data *sor = hdmi->sor;
 	u8 sb1, sb2;
+	u8 mute_val = 0;
+
+	if (update_mute)
+		mute_val = mute ? 0x1 : 0x10;
 
 	/* disable gcp before configuring */
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_CTRL, 0);
@@ -2789,6 +2956,7 @@ static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi)
 		tegra_hdmi_gcp_color_depth(hdmi);
 	sb2 = !!tegra_hdmi_gcp_default_phase_en(hdmi);
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_SUBPACK(0),
+			mute_val |
 			sb1 << NV_SOR_HDMI_GCP_SUBPACK_SB1_SHIFT |
 			sb2 << NV_SOR_HDMI_GCP_SUBPACK_SB2_SHIFT);
 
@@ -2850,8 +3018,12 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 	 * check ensures we don't reference a null edid
 	 * */
 	if (hdmi->edid) {
+		if (hdmi->hdmi_dv_signal != TEGRA_DC_EXT_DV_SIGNAL_NONE)
+			tegra_hdmi_dv_infoframe(hdmi);
+		else
+			tegra_hdmi_vendor_infoframe(hdmi,
+				HDMI_INFOFRAME_LEN_VENDOR_LLC);
 		tegra_hdmi_avi_infoframe(hdmi);
-		tegra_hdmi_vendor_infoframe(hdmi);
 		tegra_hdmi_spd_infoframe(hdmi);
 	}
 
@@ -2860,10 +3032,14 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 	else
 		tegra_dc_enable_disp_ctrl_mode(dc);
 
-	/* enable hdcp only if valid edid */
-	if (hdmi->edid_src == EDID_SRC_PANEL && !hdmi->dc->vedid &&
-		(tegra_edid_get_monspecs(hdmi->edid, &hdmi->mon_spec) == 0))
-		tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	if (dc->initialized) {
+		/* only at boot time, enable hdcp if valid edid */
+		if (!tegra_edid_get_monspecs(hdmi->edid, &hdmi->mon_spec))
+			tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	} else {
+		if (hdmi->edid_src == EDID_SRC_PANEL && !hdmi->dc->vedid)
+			tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	}
 
 	if (hdmi->dpaux) {
 		mutex_lock(&hdmi->dpaux->lock);
@@ -2886,7 +3062,7 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 			msecs_to_jiffies(HDMI_SCDC_MONITOR_TIMEOUT_MS));
 	}
 
-	tegra_hdmi_gcp(hdmi);
+	tegra_hdmi_gcp(hdmi, false, false /* ignored */);
 
 	/* check SOR pad PLL lock status */
 	/*  for newer SOC than T210 */
@@ -3349,6 +3525,39 @@ static void tegra_dc_hdmi_resume(struct tegra_dc *dc)
 				msecs_to_jiffies(HDMI_HPD_DEBOUNCE_DELAY_MS));
 
 	wait_for_completion(&dc->hpd_complete);
+}
+
+static int tegra_dc_hdmi_set_dv(struct tegra_dc *dc, struct tegra_dc_ext_dv *dv)
+{
+	u16 ret = 0;
+	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
+
+	if (hdmi->hdmi_dv_signal == dv->dv_signal)
+		return ret;
+
+	/* update hdmi dv signal with requested value */
+	hdmi->hdmi_dv_signal = dv->dv_signal;
+
+	/* update dv infoframe */
+	tegra_hdmi_dv_infoframe(hdmi);
+
+	/* update avi infoframe for quant override if required */
+	if (hdmi->dv_override.avi_quant_override_dirty) {
+		tegra_hdmi_avi_infoframe(hdmi);
+		hdmi->dv_override.avi_quant_override_dirty = false;
+	}
+
+	return ret;
+}
+
+static int tegra_dc_hdmi_set_avmute(struct tegra_dc *dc,
+				    struct tegra_dc_ext_avmute *avmute)
+{
+	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
+
+	tegra_hdmi_gcp(hdmi, true, avmute->set_or_clear);
+
+	return 0;
 }
 
 static int tegra_dc_hdmi_set_hdr(struct tegra_dc *dc)
@@ -3928,6 +4137,8 @@ struct tegra_dc_out_ops tegra_dc_hdmi2_0_ops = {
 	.vrr_update_monspecs = tegra_hdmivrr_update_monspecs,
 	.set_hdr = tegra_dc_hdmi_set_hdr,
 	.set_avi = tegra_dc_hdmi_set_avi,
+	.set_dv = tegra_dc_hdmi_set_dv,
+	.set_avmute = tegra_dc_hdmi_set_avmute,
 	.postpoweron = tegra_dc_hdmi_postpoweron,
 	.shutdown_interface = tegra_dc_hdmi_sor_sleep,
 	.get_crc = tegra_dc_hdmi_sor_crc_check,
