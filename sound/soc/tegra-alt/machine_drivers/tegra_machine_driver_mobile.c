@@ -167,6 +167,7 @@ static const struct snd_soc_dapm_widget tegra_machine_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("s Mic", NULL),
 };
 
+/*
 static struct snd_soc_pcm_stream tegra_machine_asrc_link_params[] = {
 	PARAMS(SNDRV_PCM_FMTBIT_S32_LE, 8),
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
@@ -175,7 +176,7 @@ static struct snd_soc_pcm_stream tegra_machine_asrc_link_params[] = {
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
 };
-
+*/
 static struct snd_soc_jack_pin tegra_machine_hp_jack_pins[] = {
 	{
 		.pin = "x Headphone Jack",
