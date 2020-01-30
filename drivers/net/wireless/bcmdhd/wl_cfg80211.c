@@ -15159,6 +15159,8 @@ const wl_event_msg_t *e, void *data)
 	struct net_device *ndev = NULL;
 	struct wiphy *wiphy = NULL;
 	chanspec_t chanspec;
+	scb_val_t scbval;
+	u8 *curbssid;
 
 	WL_ERR(("%s\n", __FUNCTION__));
 	/* Re-set existing country code to restore channel
@@ -15187,6 +15189,22 @@ const wl_event_msg_t *e, void *data)
 			return -1;
 		chanspec = wl_chspec_driver_to_host(chsp);
 		wl_cfg80211_ch_switch_notify(ndev, chanspec, wiphy);
+
+		/* force disconnect AP to let AGO for Blake disconnect too*/
+		curbssid = wl_read_prof(cfg, ndev, WL_PROF_BSSID);
+		wl_set_drv_status(cfg, DISCONNECTING, ndev);
+		scbval.val = 0;
+		memcpy(&scbval.ea, curbssid, ETHER_ADDR_LEN);
+		error = wldev_ioctl(ndev, WLC_DISASSOC, &scbval,
+				    sizeof(scb_val_t), true);
+		if (unlikely(error)) {
+			wl_clr_drv_status(cfg, DISCONNECTING, ndev);
+			WL_ERR(("error(%d)\n", error));
+			return error;
+		}
+		CFG80211_DISCONNECTED(ndev, 0, NULL, 0, true, GFP_KERNEL);
+		wl_link_down(cfg);
+		wl_init_prof(cfg, ndev);
 	} else {
 		WL_ERR(("%s:cfgdev is null\n", __FUNCTION__));
 		return -1;
