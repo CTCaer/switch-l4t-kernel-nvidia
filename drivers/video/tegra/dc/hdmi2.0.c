@@ -1669,9 +1669,6 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 
 	tegra_hdmi_hdr_init(hdmi);
 
-	hdmi->dv_override.avi_quant_override = AVI_QUANT_OVERRIDE_NONE;
-	hdmi->dv_override.avi_quant_override_dirty = false;
-
 	if (hdmi->pdata->hdmi2fpd_bridge_enable) {
 		hdmi2fpd_init(dc);
 		hdmi2fpd_enable(dc);
@@ -2148,7 +2145,6 @@ static u32 tegra_hdmi_get_ycc_quant(struct tegra_hdmi *hdmi)
 static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 {
 	struct hdmi_avi_infoframe *avi = &hdmi->avi;
-	struct dv_override_info *dv_override = &hdmi->dv_override;
 
 	memset(&hdmi->avi, 0, sizeof(hdmi->avi));
 
@@ -2225,6 +2221,24 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 	avi->it_content_type = HDMI_AVI_IT_CONTENT_NONE;
 	avi->ycc_quant = tegra_hdmi_get_ycc_quant(hdmi);
 
+	switch (hdmi->avi_color_quant) {
+	case TEGRA_DC_EXT_AVI_COLOR_QUANT_LIMITED:
+		if (avi->rgb_ycc == HDMI_AVI_RGB)
+			avi->rgb_quant = HDMI_AVI_RGB_QUANT_LIMITED;
+		else
+			avi->ycc_quant = HDMI_AVI_YCC_QUANT_LIMITED;
+		break;
+	case TEGRA_DC_EXT_AVI_COLOR_QUANT_FULL:
+		if (avi->rgb_ycc == HDMI_AVI_RGB)
+			avi->rgb_quant = HDMI_AVI_RGB_QUANT_FULL;
+		else
+			avi->ycc_quant = HDMI_AVI_YCC_QUANT_FULL;
+		break;
+	default:
+		/* Let default value as it is.*/
+		break;
+	}
+
 	avi->top_bar_end_line_low_byte = 0;
 	avi->top_bar_end_line_high_byte = 0;
 
@@ -2236,27 +2250,6 @@ static void tegra_hdmi_avi_infoframe_update(struct tegra_hdmi *hdmi)
 
 	avi->right_bar_start_pixel_low_byte = 0;
 	avi->right_bar_start_pixel_high_byte = 0;
-
-	/*
-	 * Apply Dolby Vision overrides
-	 */
-	switch (dv_override->avi_quant_override) {
-	case AVI_QUANT_OVERRIDE_LIMITED:
-		if (avi->rgb_ycc == HDMI_AVI_RGB)
-			avi->rgb_quant = HDMI_AVI_RGB_QUANT_LIMITED;
-		else
-			avi->ycc_quant = HDMI_AVI_YCC_QUANT_LIMITED;
-		break;
-	case AVI_QUANT_OVERRIDE_FULL:
-		if (avi->rgb_ycc == HDMI_AVI_RGB)
-			avi->rgb_quant = HDMI_AVI_RGB_QUANT_FULL;
-		else
-			avi->ycc_quant = HDMI_AVI_YCC_QUANT_FULL;
-		break;
-	default:
-		/* No override. */
-		break;
-	}
 }
 
 static void tegra_hdmi_avi_infoframe(struct tegra_hdmi *hdmi)
@@ -2292,9 +2285,11 @@ static int tegra_dc_hdmi_set_avi(struct tegra_dc *dc, struct tegra_dc_ext_avi *a
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
 
 	if (hdmi->avi_colorimetry != avi->avi_colorimetry ||
-	    hdmi->avi_color_components != avi->avi_color_components) {
+	    hdmi->avi_color_components != avi->avi_color_components ||
+	    hdmi->avi_color_quant != avi->avi_color_quant) {
 		hdmi->avi_colorimetry = avi->avi_colorimetry;
 		hdmi->avi_color_components = avi->avi_color_components;
+		hdmi->avi_color_quant = avi->avi_color_quant;
 		/* Setting AVI infoframe externally */
 		tegra_hdmi_avi_infoframe(hdmi);
 	}
@@ -2415,45 +2410,9 @@ static void tegra_hdmi_dv_infoframe_update(struct tegra_hdmi *hdmi)
 	dv->auxilary_debug = 0;
 }
 
-static void tegra_hdmi_dv_update_overrides(struct tegra_hdmi *hdmi)
-{
-	struct dv_override_info *override = &hdmi->dv_override;
-
-	if (hdmi->dvi)
-		return;
-
-	if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_NONE) {
-		/* Turn off all overrides */
-		if (override->avi_quant_override != AVI_QUANT_OVERRIDE_NONE) {
-			override->avi_quant_override = AVI_QUANT_OVERRIDE_NONE;
-			override->avi_quant_override_dirty = true;
-		}
-	} else if (hdmi->hdmi_dv_signal == TEGRA_DC_EXT_DV_SIGNAL_STANDARD) {
-		/*
-		 * Dolby Vision Standard mandates to signal full range
-		 * quantization.
-		 */
-		if (override->avi_quant_override == AVI_QUANT_OVERRIDE_NONE) {
-			override->avi_quant_override = AVI_QUANT_OVERRIDE_FULL;
-			override->avi_quant_override_dirty = true;
-		}
-	} else {
-		/*
-		 * Dolby Vision Low-latency mandates limited range
-		 * quantization.
-		 */
-		if (override->avi_quant_override == AVI_QUANT_OVERRIDE_NONE) {
-			override->avi_quant_override = AVI_QUANT_OVERRIDE_LIMITED;
-			override->avi_quant_override_dirty = true;
-		}
-	}
-}
-
 static void tegra_hdmi_dv_infoframe(struct tegra_hdmi *hdmi)
 {
 	struct tegra_dc_sor_data *sor = hdmi->sor;
-
-	tegra_hdmi_dv_update_overrides(hdmi);
 
 	/* disable/stop vsi/dv infoframe before configuring */
 	tegra_sor_writel(sor, NV_SOR_HDMI_VSI_INFOFRAME_CTRL, 0);
@@ -3540,12 +3499,6 @@ static int tegra_dc_hdmi_set_dv(struct tegra_dc *dc, struct tegra_dc_ext_dv *dv)
 
 	/* update dv infoframe */
 	tegra_hdmi_dv_infoframe(hdmi);
-
-	/* update avi infoframe for quant override if required */
-	if (hdmi->dv_override.avi_quant_override_dirty) {
-		tegra_hdmi_avi_infoframe(hdmi);
-		hdmi->dv_override.avi_quant_override_dirty = false;
-	}
 
 	return ret;
 }

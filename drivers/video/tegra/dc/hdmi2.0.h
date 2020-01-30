@@ -461,17 +461,6 @@ struct tmds_prod_pair {
 	const char *name;  /* prod-setting node name */
 };
 
-enum {
-	AVI_QUANT_OVERRIDE_NONE,
-	AVI_QUANT_OVERRIDE_LIMITED,
-	AVI_QUANT_OVERRIDE_FULL,
-};
-
-struct dv_override_info {
-	u32 avi_quant_override;
-	bool avi_quant_override_dirty;
-};
-
 struct tegra_hdmi {
 	/*
 	 * The following "dpaux" and "sor" fields need to stay at the top of
@@ -506,8 +495,7 @@ struct tegra_hdmi {
 
 	u8 avi_colorimetry;
 	u8 avi_color_components;
-
-	struct dv_override_info dv_override;
+	u8 avi_color_quant;
 
 	struct tegra_edid *edid;
 	struct i2c_client *ddc_i2c_client;
