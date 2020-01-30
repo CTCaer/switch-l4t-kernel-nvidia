@@ -302,7 +302,11 @@ static void tegra_edid_parse_dv_caps(struct tegra_edid_pvt *edid,
 
 	if (dv_ieee_id != IEEE_CEA861_DV_ID) {
 		/* not dv capable sink */
-		edid->dv_caps.vsvdb_ver = TEGRA_DC_DV_VSVDB_NONE;
+		return;
+	}
+
+	if (edid->dv_caps.vsvdb_ver != TEGRA_DC_DV_VSVDB_NONE) {
+		/* earlier parsed VSVDB marked it as DV capable */
 		return;
 	}
 
@@ -470,6 +474,18 @@ static int tegra_edid_parse_ext_block(const u8 *raw, int idx,
 			/* Got an audio data block so enable audio */
 			if (basic_audio == true)
 				edid->eld.spk_alloc = 1;
+			if (edid->quirks & TEGRA_EDID_QUIRK_IGNORE_EAC3) {
+				for (i = 0; i < edid->eld.sad_count; i++) {
+					/* Bits 3-6 of Byte 0 will have the Audio Format */
+					unsigned int format = (edid->eld.sad[i*ELD_SAD_LENGTH]
+											& 0x78) >> 3;
+
+					if (format == AUDIO_CODING_TYPE_EAC3) {
+						pr_warn("%s: format is E_AC3 skip it", __func__);
+						edid->eld.sad[i*ELD_SAD_LENGTH] = 0;
+					}
+				}
+			}
 			break;
 		}
 		/* case 2 is commented out for now */
