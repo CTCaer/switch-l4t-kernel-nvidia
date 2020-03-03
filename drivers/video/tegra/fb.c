@@ -536,7 +536,7 @@ static int tegra_fb_pan_display(struct fb_var_screeninfo *var,
 		return 0;
 #endif
 
-	if (!tegra_fb->valid && !tegra_fb_check_and_alloc_framebuffer(info))
+	if (!tegra_fb_check_and_alloc_framebuffer(info) && !tegra_fb->valid)
 		return -ENOMEM;
 
 	if (!tegra_fb->win.cur_handle) {
@@ -578,7 +578,7 @@ static void tegra_fb_fillrect(struct fb_info *info,
 {
 	struct tegra_fb_info *tegra_fb = info->par;
 
-	if (!tegra_fb->valid && !tegra_fb_check_and_alloc_framebuffer(info))
+	if (!tegra_fb_check_and_alloc_framebuffer(info) && !tegra_fb->valid)
 		return;
 
 	cfb_fillrect(info, rect);
@@ -589,7 +589,7 @@ static void tegra_fb_copyarea(struct fb_info *info,
 {
 	struct tegra_fb_info *tegra_fb = info->par;
 
-	if (!tegra_fb->valid && !tegra_fb_check_and_alloc_framebuffer(info))
+	if (!tegra_fb_check_and_alloc_framebuffer(info) && !tegra_fb->valid)
 		return;
 
 	cfb_copyarea(info, region);
@@ -600,7 +600,7 @@ static void tegra_fb_imageblit(struct fb_info *info,
 {
 	struct tegra_fb_info *tegra_fb = info->par;
 
-	if (!tegra_fb->valid && !tegra_fb_check_and_alloc_framebuffer(info))
+	if (!tegra_fb_check_and_alloc_framebuffer(info) && !tegra_fb->valid)
 		return;
 
 	cfb_imageblit(info, image);
@@ -809,7 +809,7 @@ static int tegra_fb_mmap(struct fb_info *info,
 {
 	struct tegra_fb_info *tegra_fb = info->par;
 
-	if (!tegra_fb->valid && !tegra_fb_check_and_alloc_framebuffer(info))
+	if (!tegra_fb_check_and_alloc_framebuffer(info) && !tegra_fb->valid)
 		return -ENOMEM;
 
 	tegra_fb->mmap_count++;
