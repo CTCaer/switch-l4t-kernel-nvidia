@@ -1,7 +1,7 @@
 /*
  * edid_quirks.c: edid specific exceptions.
  *
- * Copyright (c) 2015-2019, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2015-2020, NVIDIA CORPORATION, All rights reserved.
  * Author: Anshuman Nath Kar <anshumank@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -46,6 +46,10 @@ static const struct hdmi_blacklist {
 	{ "SAM", 3387, "SAMSUNG",   TEGRA_EDID_QUIRK_HPD_BOUNCE },
 	/* WAR for bug 2408317 to skip non-CEA modes */
 	{ "KL@", 18508, "LCD HDTV", TEGRA_EDID_QUIRK_ONLY_CEA   },
+	/* WAR for bug 2818605 to add missing DV 4k@60 */
+	{ "LGE", 0,    "LG-SBAR",   TEGRA_EDID_QUIRK_LG_SBAR    },
+	/* WAR for bug 2789334 to fix Dolby Vision VSVDB length */
+	{ "VIZ", 4149, "M558-G1",   TEGRA_EDID_QUIRK_VSVDB_LEN  },
 };
 
 u32 tegra_edid_lookup_quirks(const char *manufacturer, u32 model,

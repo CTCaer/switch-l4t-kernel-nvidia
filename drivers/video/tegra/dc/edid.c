@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2010-2019, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2010-2020, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -916,6 +916,58 @@ bool tegra_edid_support_yuv444(struct tegra_edid *edid)
 	return edid->data->support_yuv444;
 }
 
+/* Add VIC modes with id 96 and 97 */
+void tegra_edid_quirk_lg_sbar(struct tegra_edid_pvt *new_data,
+			      struct fb_monspecs *specs)
+{
+	struct fb_videomode *m;
+
+	/* Additional checks that we got the specific EDID */
+	if (new_data->max_tmds_char_rate_hf_mhz != 450 ||
+	    new_data->dv_caps.vsvdb_ver != TEGRA_DC_DV_VSVDB_V1_12B ||
+	    new_data->dv_caps.v1_12b.supports_2160p60hz == 0) {
+		return;
+	}
+
+	m = kzalloc((specs->modedb_len + 2) *
+		    sizeof(struct fb_videomode), GFP_KERNEL);
+	if (m) {
+		memcpy(m, specs->modedb,
+		       specs->modedb_len * sizeof(struct fb_videomode));
+
+		memcpy(m + specs->modedb_len, &cea_modes[96],
+		       sizeof(struct fb_videomode));
+		m[specs->modedb_len].vmode |= FB_VMODE_IS_CEA;
+		specs->modedb_len++;
+		memcpy(m + specs->modedb_len, &cea_modes[97],
+		       sizeof(struct fb_videomode));
+		m[specs->modedb_len].vmode |= FB_VMODE_IS_CEA;
+		specs->modedb_len++;
+
+		kfree(specs->modedb);
+		specs->modedb = m;
+	}
+}
+
+/* Fix length of VSVDB */
+void tegra_edid_quirk_vsvdb_len(u8 *data)
+{
+	/* Fix only a specific length of Dolby Vision VSVDB */
+	if (data[EDID_BYTES_PER_BLOCK-23] != 0xef ||
+	    data[EDID_BYTES_PER_BLOCK-21] != ((IEEE_CEA861_DV_ID >> 0) & 0xff) ||
+	    data[EDID_BYTES_PER_BLOCK-20] != ((IEEE_CEA861_DV_ID >> 8) & 0xff) ||
+	    data[EDID_BYTES_PER_BLOCK-19] != ((IEEE_CEA861_DV_ID >> 16) & 0xff))
+		return;
+
+	/* Additional check of checksum that we got the specific EDID */
+	if (data[EDID_BYTES_PER_BLOCK-1] != 0x9c)
+		return;
+
+	/* Fix the length and adjust checksum */
+	data[EDID_BYTES_PER_BLOCK-23] -= 4;
+	data[EDID_BYTES_PER_BLOCK-1] += 4;
+}
+
 int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 {
 	int i;
@@ -1007,6 +1059,10 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 				goto fail;
 		}
 
+		if (new_data->quirks == TEGRA_EDID_QUIRK_VSVDB_LEN) {
+			tegra_edid_quirk_vsvdb_len(data + i * EDID_BYTES_PER_BLOCK);
+		}
+
 		if (data[i * EDID_BYTES_PER_BLOCK] == 0x2) {
 			fb_edid_add_monspecs(
 				data + i * EDID_BYTES_PER_BLOCK,
@@ -1015,6 +1071,9 @@ int tegra_edid_get_monspecs(struct tegra_edid *edid, struct fb_monspecs *specs)
 				data + i * EDID_BYTES_PER_BLOCK,
 				data[i * EDID_BYTES_PER_BLOCK + 2],
 				new_data);
+
+			if (new_data->quirks == TEGRA_EDID_QUIRK_LG_SBAR)
+				tegra_edid_quirk_lg_sbar(new_data, specs);
 
 			if (new_data->support_stereo) {
 				for (j = 0; j < specs->modedb_len; j++) {

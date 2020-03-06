@@ -4,7 +4,7 @@
  * Copyright (C) 2010 Google, Inc.
  * Author: Erik Gilling <konkers@android.com>
  *
- * Copyright (c) 2011-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2011-2020, NVIDIA CORPORATION.  All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -147,6 +147,10 @@ enum {
 #define TEGRA_EDID_QUIRK_ONLY_CEA	(1 << 5)
 /* TVs supports EAC3 but not 192K, ignoring EAC3 */
 #define TEGRA_EDID_QUIRK_IGNORE_EAC3 (1 << 6)
+/* LG soundbar advertises DV 4k@60 but does not advertise non-DV 4k@60 */
+#define TEGRA_EDID_QUIRK_LG_SBAR (1 << 7)
+/* Samsung soundbar HW-Q70R advertises incorrect Dolby Vision VSVDB length */
+#define TEGRA_EDID_QUIRK_VSVDB_LEN (1 << 8)
 
 /* This number is defined in hda driver - enum cea_audio_coding_types */
 #define    AUDIO_CODING_TYPE_EAC3    10
