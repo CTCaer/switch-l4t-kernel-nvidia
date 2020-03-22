@@ -1380,7 +1380,7 @@ static int tegra_dc_init_default_panel_link_cfg(struct tegra_dc_dp_data *dp)
 		cfg->tps = TEGRA_DC_DP_TRAINING_PATTERN_2;
 		cfg->support_enhanced_framing = true;
 		cfg->downspread = true;
-		cfg->support_fast_lt = true;
+		cfg->support_fast_lt = !dp->pdata->fast_lt_disable;
 		cfg->aux_rd_interval = 0;
 		cfg->alt_scramber_reset_cap = true;
 		cfg->only_enhanced_framing = true;
@@ -1446,8 +1446,8 @@ static int tegra_dp_init_sink_link_cfg(struct tegra_dc_dp_data *dp,
 	cfg->downspread =
 		(dpcd_data & NV_DPCD_MAX_DOWNSPREAD_VAL_0_5_PCT) ?
 		true : false;
-	cfg->support_fast_lt = (dpcd_data &
-		NV_DPCD_MAX_DOWNSPREAD_NO_AUX_HANDSHAKE_LT_T) ?
+	cfg->support_fast_lt = ((dpcd_data &
+		NV_DPCD_MAX_DOWNSPREAD_NO_AUX_HANDSHAKE_LT_T) && !dp->pdata->fast_lt_disable) ?
 		true : false;
 
 	ret = tegra_dc_dp_dpcd_read(dp, NV_DPCD_TRAINING_AUX_RD_INTERVAL,

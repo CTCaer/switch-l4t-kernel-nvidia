@@ -1137,6 +1137,7 @@ struct tegra_dc_extcon_cable {
 struct tegra_dp_out {
 	struct tegra_dc_dp_lt_settings *lt_settings;
 	int n_lt_settings;
+	bool fast_lt_disable;
 	bool tx_pu_disable;
 	bool enhanced_framing_disable;
 	bool pc2_disabled;
