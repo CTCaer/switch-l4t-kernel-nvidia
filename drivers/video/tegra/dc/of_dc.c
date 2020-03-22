@@ -2082,6 +2082,10 @@ static int parse_dp_settings(struct platform_device *ndev,
 			goto parse_dp_settings_fail;
 	}
 
+	dpout->fast_lt_disable = of_property_read_bool(np_dp_panel,
+			"nvidia,fast-lt-disable");
+	OF_DC_LOG("fast_lt_disable %d\n", dpout->fast_lt_disable);
+
 	if (!of_property_read_u32(np_dp_panel, "nvidia,tx-pu-disable", &temp)) {
 		dpout->tx_pu_disable = (bool)temp;
 		OF_DC_LOG("tx_pu_disable %d\n", dpout->tx_pu_disable);
