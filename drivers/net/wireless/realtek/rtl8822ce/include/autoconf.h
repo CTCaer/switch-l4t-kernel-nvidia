@@ -16,7 +16,11 @@
 #define CONFIG_HEXFILE_CHANNEL_PLAN
 #define CONFIG_HEXFILE_POWER_LIMIT
 #define RTW_HEXFILE_LEN 2001
+#ifdef CONFIG_PLATFORM_ANDROID
+#define RTW_HEXFILE_NAME "/vendor/firmware/rtl8822_setting.bin"
+#else
 #define RTW_HEXFILE_NAME "/lib/firmware/rtl8822_setting.bin"
+#endif
 #define CONFIG_SINGLE_IMG
 /* #define CONFIG_DISABLE_ODM */
 
