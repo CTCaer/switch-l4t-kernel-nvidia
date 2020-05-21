@@ -3451,6 +3451,50 @@ u32 rtw_read_macaddr_from_file(const char *path, u8 *buf)
 exit:
 	return ret;
 }
+
+/* Get MAC address from the specified DTB path */
+u32 rtw_read_macaddr_from_dtb(const char *node_name,
+			      const char *property_name,
+			      u8 *mac_addr)
+{
+	struct device_node *np = of_find_node_by_path(node_name);
+	const char *mac_str = NULL;
+	int values[6] = {0};
+	unsigned char mac_temp[6] = {0};
+	int i;
+	u32 ret = _FAIL;
+
+	if (!np)
+		return ret;
+
+	/* If the property is present but contains an invalid value,
+	 * then something is wrong. Log the error in that case.
+	 */
+	if (of_property_read_string(np, property_name, &mac_str)) {
+		goto err_out;
+	}
+
+	/* The DTB property is a string of the form xx:xx:xx:xx:xx:xx
+	 * Convert to an array of bytes.
+	 */
+	if (sscanf(mac_str, "%x:%x:%x:%x:%x:%x",
+		&values[0], &values[1], &values[2],
+		&values[3], &values[4], &values[5]) != 6) {
+		goto err_out;
+	}
+
+	for (i = 0; i < 6; ++i)
+		mac_temp[i] = (unsigned char)values[i];
+
+	memcpy(mac_addr, mac_temp, 6);
+
+	ret = _SUCCESS;
+
+err_out:
+	of_node_put(np);
+
+	return ret;
+}
 #endif /* CONFIG_EFUSE_CONFIG_FILE */
 
 #endif /* PLATFORM_LINUX */

@@ -13498,6 +13498,11 @@ u32 Hal_ReadMACAddrFromFile(PADAPTER padapter, u8 *mac_addr)
 	) {
 		hal_data->macaddr_file_status = MACADDR_FILE_LOADED;
 		ret = _SUCCESS;
+	} else if (rtw_read_macaddr_from_dtb("/chosen", "nvidia,wifi-mac", mac_addr) == _SUCCESS
+		&& rtw_check_invalid_mac_address(mac_addr, _TRUE) == _FALSE
+	) {
+		hal_data->macaddr_file_status = MACADDR_FILE_LOADED;
+		ret = _SUCCESS;
 	} else
 		hal_data->macaddr_file_status = MACADDR_FILE_FAILED;
 
