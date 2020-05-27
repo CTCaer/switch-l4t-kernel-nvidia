@@ -11,7 +11,7 @@
  * GNU General Public License for more details.
  *
  */
-
+#define DEBUG 1
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
@@ -743,7 +743,6 @@ static int actmon_rate_notify_cb(
 	else
 		dev->cur_freq = rate / 1000;
 
-	dev_dbg(mon_dev, "rate:%lu\n", dev->cur_freq);
 
 	if (dev->type == ACTMON_FREQ_SAMPLER) {
 		actmon_dev_wmark_set(dev);
