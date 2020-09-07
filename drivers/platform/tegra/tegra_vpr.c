@@ -51,11 +51,9 @@ static struct vpr_user_module_info {
 } vpr_user_module[NUM_MODULES_IDLE_VPR_RESIZE];
 static int _tegra_set_vpr_params(void *vpr_base, size_t vpr_size);
 
-static size_t previous_size = 0;
-
 static int tegra_update_resize_cfg(phys_addr_t base , size_t size)
 {
-	int i = 0, err = 0, j;
+	int i = 0, err = 0;
 #define MAX_RETRIES 6
 	int retries = MAX_RETRIES;
 	mutex_lock(&vpr_lock);
@@ -74,22 +72,12 @@ retry:
 	}
 	if (!err) {
 		/* Config VPR_BOM/_SIZE in MC */
-		if (previous_size > size) {
-			for (j = 3; j >= 0 && !err; --j) {
-				err = _tegra_set_vpr_params((void *)(uintptr_t)base, size + j * (previous_size - size) / 4);
-				msleep(5);
-			}
-		} else {
-			err = _tegra_set_vpr_params((void *)(uintptr_t)base, size);
-			msleep(5);
-		}
-		if (err) {
+		err = _tegra_set_vpr_params((void *)(uintptr_t)base, size);
+		if (err)
 			pr_err("vpr resize to (%p, %zu) failed. err=%d\n",
 				(void *)(uintptr_t)base, size, err);
-		} else {
+		else
 			retries = 0; /* finish */
-			previous_size = size;
-		}
 	}
 	if (retries--) {
 		pr_err("%s:%d: fail retry=%d",

@@ -129,6 +129,10 @@ struct tegra_dc_ext_flip_data {
 	u8 flags;
 	struct tegra_dc_hdr hdr_data;
 	struct tegra_dc_ext_avi avi_info;
+	struct tegra_dc_ext_dv dv_data;
+	struct tegra_dc_ext_avmute avmute_data;
+	bool avmute_cache_dirty;
+	bool dv_cache_dirty;
 	bool hdr_cache_dirty;
 	bool avi_cache_dirty;
 	bool imp_dirty;
@@ -1211,6 +1215,14 @@ static void tegra_dc_ext_flip_worker(struct kthread_work *work)
 	if (dc->enabled && !skip_flip) {
 		tegra_dc_set_hdr(dc, &data->hdr_data, data->hdr_cache_dirty);
 
+		if (data->dv_cache_dirty)
+			if (dc->out_ops && dc->out_ops->set_dv)
+				dc->out_ops->set_dv(dc, &data->dv_data);
+
+		if (data->avmute_cache_dirty)
+			if (dc->out_ops && dc->out_ops->set_avmute)
+				dc->out_ops->set_avmute(dc, &data->avmute_data);
+
 		dc->blanked = false;
 		if (dc->out_ops && dc->out_ops->vrr_enable)
 				dc->out_ops->vrr_enable(dc,
@@ -1804,7 +1816,31 @@ static int tegra_dc_ext_read_user_data(struct tegra_dc_ext_flip_data *data,
 						 &flip_user_data[i].avi_info;
 
 			kdata->avi_colorimetry = udata->avi_colorimetry;
+			kdata->avi_color_components = udata->avi_color_components;
+			kdata->avi_color_quant = udata->avi_color_quant;
 			data->avi_cache_dirty = true;
+			break;
+		}
+		case TEGRA_DC_EXT_FLIP_USER_DATA_DV_DATA:
+		{
+			struct tegra_dc_ext_dv *kdata =
+				&data->dv_data;
+			struct tegra_dc_ext_dv *udata =
+				&flip_user_data[i].dv_info;
+
+			kdata->dv_signal = udata->dv_signal;
+			data->dv_cache_dirty = true;
+			break;
+		}
+		case TEGRA_DC_EXT_FLIP_USER_DATA_AVMUTE_DATA:
+		{
+			struct tegra_dc_ext_avmute *kdata =
+				&data->avmute_data;
+			struct tegra_dc_ext_avmute *udata =
+				&flip_user_data[i].avmute_info;
+
+			kdata->set_or_clear = udata->set_or_clear;
+			data->avmute_cache_dirty = true;
 			break;
 		}
 		case TEGRA_DC_EXT_FLIP_USER_DATA_IMP_TAG:
@@ -2069,6 +2105,12 @@ fail_pin:
 			dma_buf_put(data->win[i].handle[j]->buf);
 			kfree(data->win[i].handle[j]);
 		}
+#ifdef CONFIG_TEGRA_GRHOST_SYNC
+		if (data->win[i].pre_syncpt_fence) {
+			sync_fence_put(data->win[i].pre_syncpt_fence);
+		}
+#endif
+
 	}
 
 	/* Release the COMMON channel in case of failure. */
@@ -2624,6 +2666,21 @@ static int tegra_dc_get_cap_quant_info(struct tegra_dc_ext_user *user,
 	return ret;
 }
 
+static void tegra_dc_get_cap_dv_info(struct tegra_dc_ext_user *user,
+				struct tegra_dc_ext_dv_caps *dv_cap_info)
+{
+	struct tegra_dc *dc = user->ext->dc;
+	struct tegra_edid *dc_edid = dc->edid;
+
+	/* Currently only dc->edid has this info. In future,
+	 * we have to provide info for non-edid interfaces
+	 * in the device tree.
+	 */
+	if (dc_edid)
+		tegra_edid_get_ex_dv_cap_info(dc_edid, dv_cap_info);
+
+}
+
 static int tegra_dc_get_caps(struct tegra_dc_ext_user *user,
 				struct tegra_dc_ext_caps *caps,
 				int nr_elements)
@@ -2656,6 +2713,24 @@ static int tegra_dc_get_caps(struct tegra_dc_ext_user *user,
 				sizeof(quant_cap_info))) {
 				return -EFAULT;
 			}
+			break;
+		}
+		case TEGRA_DC_EXT_CAP_TYPE_DV_SINK:
+		{
+			struct tegra_dc_ext_dv_caps *dv_cap_info;
+
+			dv_cap_info = kzalloc(sizeof(*dv_cap_info),
+				GFP_KERNEL);
+
+			tegra_dc_get_cap_dv_info(user, dv_cap_info);
+
+			if (copy_to_user((void __user *)(uintptr_t)
+				caps[i].data, dv_cap_info,
+				sizeof(*dv_cap_info))) {
+				kfree(dv_cap_info);
+				return -EFAULT;
+			}
+			kfree(dv_cap_info);
 			break;
 		}
 		default:

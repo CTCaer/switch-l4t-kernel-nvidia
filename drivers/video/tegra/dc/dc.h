@@ -1204,4 +1204,7 @@ long tegra_dc_crc_disable(struct tegra_dc *dc,
 			  struct tegra_dc_ext_crc_arg *arg);
 long tegra_dc_crc_get(struct tegra_dc *dc, struct tegra_dc_ext_crc_arg *arg);
 
+void tegra_dc_link_supervisor_control(struct tegra_dc *dc, bool enable);
+bool tegra_dc_is_link_supervisor_activated(struct tegra_dc *dc);
+
 #endif
