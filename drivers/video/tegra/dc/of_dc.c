@@ -81,6 +81,7 @@
 static struct regulator *of_hdmi_vddio;
 static struct regulator *of_hdmi_dp_reg;
 static struct regulator *of_hdmi_pll;
+static struct regulator *of_hdmi_tmds_clk_data;
 
 static struct regulator *of_dp_pwr;
 static struct regulator *of_dp_pll;
@@ -2257,6 +2258,26 @@ static int dc_dp_out_postsuspend(void)
 static int dc_hdmi_out_enable(struct device *dev)
 {
 	int err = 0;
+	bool of_hdmi_tmds_clk_data_en = false;
+	bool of_hdmi_dp_reg_en = false;
+	bool of_hdmi_pll_en = false;
+
+	if (!of_hdmi_tmds_clk_data) {
+		of_hdmi_tmds_clk_data = devm_regulator_get(dev,
+			"avdd_hdmi_tmds_clk_data");
+		if (IS_ERR(of_hdmi_tmds_clk_data))
+			of_hdmi_tmds_clk_data = NULL;
+	}
+
+	if (of_hdmi_tmds_clk_data) {
+		err = regulator_enable(of_hdmi_tmds_clk_data);
+		if (err < 0) {
+			dev_err(dev, "%s: couldn't enable regulator %s\n",
+					__func__, "avdd_hdmi_tmds_clk_data");
+			goto dc_hdmi_out_en_fail;
+		}
+		of_hdmi_tmds_clk_data_en = true;
+	}
 
 	if (!of_hdmi_dp_reg) {
 		of_hdmi_dp_reg = devm_regulator_get(dev, "avdd_hdmi");
@@ -2274,6 +2295,8 @@ static int dc_hdmi_out_enable(struct device *dev)
 				__func__, "avdd_hdmi");
 		goto dc_hdmi_out_en_fail;
 	}
+	of_hdmi_dp_reg_en = true;
+
 	if (!of_hdmi_pll) {
 		of_hdmi_pll = devm_regulator_get(dev, "avdd_hdmi_pll");
 		if (IS_ERR(of_hdmi_pll)) {
@@ -2291,7 +2314,19 @@ static int dc_hdmi_out_enable(struct device *dev)
 				__func__, "avdd_hdmi_pll");
 		goto dc_hdmi_out_en_fail;
 	}
+	of_hdmi_pll_en = true;
+
+	return 0;
+
 dc_hdmi_out_en_fail:
+	if (of_hdmi_pll_en)
+		regulator_disable(of_hdmi_pll);
+
+	if (of_hdmi_dp_reg_en)
+		regulator_disable(of_hdmi_dp_reg);
+
+	if (of_hdmi_tmds_clk_data_en)
+		regulator_disable(of_hdmi_tmds_clk_data);
 	return err;
 }
 
@@ -2312,13 +2347,14 @@ static int dc_hdmi_out_disable(struct device *dev)
 	if (hdmi->device_shutdown)
 		return 0;
 
-	if (of_hdmi_dp_reg) {
+	if (of_hdmi_dp_reg)
 		regulator_disable(of_hdmi_dp_reg);
-	}
 
-	if (of_hdmi_pll) {
+	if (of_hdmi_pll)
 		regulator_disable(of_hdmi_pll);
-	}
+
+	if (of_hdmi_tmds_clk_data)
+		regulator_disable(of_hdmi_tmds_clk_data);
 
 	return 0;
 }

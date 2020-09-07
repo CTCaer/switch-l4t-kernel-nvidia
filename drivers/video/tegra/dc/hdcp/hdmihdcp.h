@@ -81,6 +81,7 @@ struct tegra_nvhdcp {
 };
 
 #ifdef CONFIG_HDCP
+u16 tegra_nvhdcp_read_bstatus(struct tegra_nvhdcp *nvhdcp, u16 *b_status);
 void tegra_nvhdcp_set_plug(struct tegra_nvhdcp *nvhdcp, bool hpd);
 void tegra_nvhdcp_clear_fallback(struct tegra_nvhdcp *nvhdcp);
 int tegra_nvhdcp_set_policy(struct tegra_nvhdcp *nvhdcp, int pol);
@@ -98,6 +99,10 @@ extern int te_launch_trusted_oper_tlk(u64 *buf, u32 buflen, u32 session_id,
 
 extern void te_close_trusted_session_tlk(u32 session_id, u32 *ta_uuid, u32 size);
 #else
+static u16 tegra_nvhdcp_read_bstatus(struct tegra_nvhdcp *nvhdcp, u16 *b_status)
+{
+	return 0;
+}
 static inline void tegra_nvhdcp_set_plug(struct tegra_nvhdcp *nvhdcp, bool hpd)
 {
 }
