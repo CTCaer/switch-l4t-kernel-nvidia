@@ -450,6 +450,34 @@ static ssize_t panel_rotate_show(struct device *device,
 
 static DEVICE_ATTR(panel_rotation, 0444, panel_rotate_show, NULL);
 
+static ssize_t link_supervisor_store(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	int val;
+	int e;
+	struct platform_device *ndev = to_platform_device(dev);
+	struct tegra_dc *dc = platform_get_drvdata(ndev);
+
+	e = kstrtoint(buf, 10, &val);
+	if (e)
+		return e;
+
+	tegra_dc_link_supervisor_control(dc, val);
+
+	return count;
+}
+
+static ssize_t link_supervisor_show(struct device *dev,
+	struct device_attribute *attr, char *buf)
+{
+	struct platform_device *ndev = to_platform_device(dev);
+	struct tegra_dc *dc = platform_get_drvdata(ndev);
+
+	return snprintf(buf, PAGE_SIZE, "%d\n", tegra_dc_is_link_supervisor_activated(dc));
+}
+
+static DEVICE_ATTR(hdmi_link_supervisor, 0644, link_supervisor_show, link_supervisor_store);
+
 /* display current window assignment bitmask in
  * hexadecimal for the given dc device->dev */
 static ssize_t win_mask_show(struct device *device,
@@ -544,6 +572,9 @@ void tegra_dc_remove_sysfs(struct device *dev)
 
 	if (dc->out->type != TEGRA_DC_OUT_HDMI)
 		device_remove_file(dev, &dev_attr_panel_rotation);
+
+	if (dc->out->type == TEGRA_DC_OUT_HDMI)
+		device_remove_file(dev, &dev_attr_hdmi_link_supervisor);
 }
 
 void tegra_dc_create_sysfs(struct device *dev)
@@ -591,6 +622,8 @@ void tegra_dc_create_sysfs(struct device *dev)
 		error |= device_create_file(dev, &dev_attr_smart_panel);
 	if (dc->out->type != TEGRA_DC_OUT_HDMI)
 		error |= device_create_file(dev, &dev_attr_panel_rotation);
+	if (dc->out->type == TEGRA_DC_OUT_HDMI)
+		error |= device_create_file(dev, &dev_attr_hdmi_link_supervisor);
 
 	if (error)
 		dev_err(&ndev->dev, "Failed to create sysfs attributes!\n");

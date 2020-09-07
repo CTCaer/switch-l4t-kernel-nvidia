@@ -5,7 +5,7 @@
  * Copyright (C) 1999-2015, Broadcom Corporation
  *
  * Portions contributed by Nvidia
- * Copyright (C) 2015-2019, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2015-2020, NVIDIA Corporation. All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -6161,6 +6161,13 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	}
 #endif /* GET_CUSTOM_MAC_ENABLE */
 
+	ret = dhd_apply_default_clm(dhd, clm_path);
+	if (ret < 0) {
+		DHD_ERROR(("%s: CLM set failed. Abort initialization.\n",
+			   __func__));
+		goto done;
+	}
+
 	/* get a capabilities from firmware */
 	ret = dhd_iovar(dhd, 0, "cap", NULL, 0, (char *)&dhd->fw_capabilities,
 			sizeof(dhd->fw_capabilities), FALSE);
@@ -6419,12 +6426,6 @@ if (bcmdhd_dhd_enable_lpc) {
 		}
 	}
 #endif /* defined(KEEP_ALIVE) */
-
-	ret = dhd_apply_default_clm(dhd, clm_path);
-	if (ret < 0) {
-		DHD_ERROR(("%s: CLM set failed. Abort initialization.\n", __FUNCTION__));
-		goto done;
-	}
 
 #ifdef USE_WL_TXBF
 if (bcmdhd_use_wl_txbf) {

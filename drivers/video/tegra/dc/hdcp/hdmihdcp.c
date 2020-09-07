@@ -148,7 +148,7 @@ static inline bool nvhdcp_set_plugged(struct tegra_nvhdcp *nvhdcp, bool plugged)
 }
 
 static int nvhdcp_i2c_read(struct tegra_nvhdcp *nvhdcp, u8 reg,
-					size_t len, void *data)
+			   size_t len, void *data, bool ignore_plugged)
 {
 	int status;
 	int retries = 10;
@@ -174,7 +174,7 @@ static int nvhdcp_i2c_read(struct tegra_nvhdcp *nvhdcp, u8 reg,
 	tegra_dc_ddc_enable(dc, true);
 	do {
 		mutex_lock(&nvhdcp->lock);
-		if (!nvhdcp_is_plugged(nvhdcp)) {
+		if (!ignore_plugged && !nvhdcp_is_plugged(nvhdcp)) {
 			nvhdcp_err("disconnect during i2c xfer\n");
 			mutex_unlock(&nvhdcp->lock);
 			tegra_dc_ddc_enable(dc, false);
@@ -253,7 +253,7 @@ skip_hdcp_i2c:
 
 static inline int nvhdcp_i2c_read8(struct tegra_nvhdcp *nvhdcp, u8 reg, u8 *val)
 {
-	return nvhdcp_i2c_read(nvhdcp, reg, 1, val);
+	return nvhdcp_i2c_read(nvhdcp, reg, 1, val, false);
 }
 
 static inline int nvhdcp_i2c_write8(struct tegra_nvhdcp *nvhdcp, u8 reg, u8 val)
@@ -262,12 +262,12 @@ static inline int nvhdcp_i2c_write8(struct tegra_nvhdcp *nvhdcp, u8 reg, u8 val)
 }
 
 static inline int nvhdcp_i2c_read16(struct tegra_nvhdcp *nvhdcp,
-					u8 reg, u16 *val)
+					u8 reg, u16 *val, bool ignore_plugged)
 {
 	u8 buf[2];
 	int e;
 
-	e = nvhdcp_i2c_read(nvhdcp, reg, sizeof(buf), buf);
+	e = nvhdcp_i2c_read(nvhdcp, reg, sizeof(buf), buf, ignore_plugged);
 	if (e)
 		return e;
 
@@ -283,7 +283,7 @@ static int nvhdcp_i2c_read40(struct tegra_nvhdcp *nvhdcp, u8 reg, u64 *val)
 	int e, i;
 	u64 n;
 
-	e = nvhdcp_i2c_read(nvhdcp, reg, sizeof(buf), buf);
+	e = nvhdcp_i2c_read(nvhdcp, reg, sizeof(buf), buf, false);
 	if (e)
 		return e;
 
@@ -402,7 +402,7 @@ static inline u16 get_transmitter_ri(struct tegra_hdmi *hdmi)
 
 static inline int get_receiver_ri(struct tegra_nvhdcp *nvhdcp, u16 *r)
 {
-	return nvhdcp_i2c_read16(nvhdcp, 0x8, r); /* long read */
+	return nvhdcp_i2c_read16(nvhdcp, 0x8, r, false); /* long read */
 }
 
 static int get_bcaps(struct tegra_nvhdcp *nvhdcp, u8 *b_caps)
@@ -428,7 +428,7 @@ static int get_ksvfifo(struct tegra_nvhdcp *nvhdcp,
 	if (IS_ERR_OR_NULL(buf))
 		return -ENOMEM;
 
-	e = nvhdcp_i2c_read(nvhdcp, 0x43, buf_len, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x43, buf_len, buf, false);
 	if (e) {
 		kfree(buf);
 		return e;
@@ -452,7 +452,7 @@ static int get_vprime(struct tegra_nvhdcp *nvhdcp, u8 *v_prime)
 	int e, i;
 
 	for (i = 0; i < 20; i += 4) {
-		e = nvhdcp_i2c_read(nvhdcp, 0x20 + i, 4, v_prime + i);
+		e = nvhdcp_i2c_read(nvhdcp, 0x20 + i, 4, v_prime + i, false);
 		if (e)
 			return e;
 	}
@@ -987,7 +987,7 @@ static int get_repeater_info(struct tegra_nvhdcp *nvhdcp)
 		return e;
 	}
 
-	e = nvhdcp_i2c_read16(nvhdcp, 0x41, &b_status);
+	e = nvhdcp_i2c_read16(nvhdcp, 0x41, &b_status, false);
 	if (e) {
 		nvhdcp_err("Bstatus read failure!\n");
 		return e;
@@ -1028,7 +1028,7 @@ static int nvhdcp_ake_init_send(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 static int nvhdcp_ake_cert_receive(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_CERT, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_CERT, buf, false);
 	return e;
 }
 
@@ -1042,7 +1042,7 @@ static int nvhdcp_ake_no_stored_km_send(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 static int nvhdcp_ake_hprime_receive(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_HPRIME, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_HPRIME, buf, false);
 	return e;
 }
 
@@ -1050,7 +1050,8 @@ static int nvhdcp_ake_pairing_info_receive(struct tegra_nvhdcp *nvhdcp,
 	u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_PAIRING_INFO, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_AKE_SEND_PAIRING_INFO, buf,
+	    false);
 	return e;
 }
 
@@ -1064,7 +1065,7 @@ static int nvhdcp_lc_init_send(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 static int nvhdcp_lc_lprime_receive(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_LC_SEND_LPRIME, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_LC_SEND_LPRIME, buf, false);
 	return e;
 }
 
@@ -1078,7 +1079,7 @@ static int nvhdcp_ske_eks_send(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 static int nvhdcp_receiverid_list_receive(struct tegra_nvhdcp *nvhdcp, u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_SEND_RCVR_ID_LIST, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_SEND_RCVR_ID_LIST, buf, false);
 	return e;
 }
 
@@ -1101,7 +1102,8 @@ static int nvhdcp_rptr_stream_ready_receive(struct tegra_nvhdcp *nvhdcp,
 	u8 *buf)
 {
 	int e;
-	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_SEND_RPTR_STREAM_READY, buf);
+	e = nvhdcp_i2c_read(nvhdcp, 0x80, SIZE_SEND_RPTR_STREAM_READY, buf,
+		false);
 	return e;
 }
 
@@ -1120,7 +1122,7 @@ static int nvhdcp_poll(struct tegra_nvhdcp *nvhdcp, int timeout, int status)
 		if ((end_time - start_time)/1000 >= (s64)timeout*1000)
 			return -ETIMEDOUT;
 		else {
-			e = nvhdcp_i2c_read(nvhdcp, 0x70, 2, &val);
+			e = nvhdcp_i2c_read(nvhdcp, 0x70, 2, &val, false);
 			if (e) {
 				nvhdcp_err("nvhdcp_poll_ready failed\n");
 				goto exit;
@@ -1946,7 +1948,7 @@ static int link_integrity_check(struct tegra_nvhdcp *nvhdcp,
 	if (!pkt)
 		goto exit;
 
-	nvhdcp_i2c_read16(nvhdcp, HDCP_RX_STATUS, &rx_status);
+	nvhdcp_i2c_read16(nvhdcp, HDCP_RX_STATUS, &rx_status, false);
 	if (nvhdcp->repeater && (rx_status & HDCP_RX_STATUS_MSG_READY_YES)) {
 		err = nvhdcp_poll_ready(nvhdcp, 1000);
 		if (err) {
@@ -2169,6 +2171,8 @@ static int tegra_nvhdcp_on(struct tegra_nvhdcp *nvhdcp)
 		e = nvhdcp_i2c_read8(nvhdcp, HDCP_HDCP2_VERSION, &hdcp2version);
 		if (e)
 			nvhdcp_err("nvhdcp i2c HDCP22 version read failed\n");
+		else
+			nvhdcp_info("nvhdcp version = %d\n", hdcp2version);
 		/* Do not stop nauthentication if i2c version reads fail as  */
 		/* HDCP 1.x test 1A-04 expects reading HDCP regs */
 		if (hdcp2version & HDCP_HDCP2_VERSION_HDCP22_YES) {
@@ -2242,6 +2246,11 @@ void tegra_nvhdcp_set_plug(struct tegra_nvhdcp *nvhdcp, bool hpd)
 	} else {
 		tegra_nvhdcp_off(nvhdcp);
 	}
+}
+
+u16 tegra_nvhdcp_read_bstatus(struct tegra_nvhdcp *nvhdcp, u16 *b_status)
+{
+	return nvhdcp_i2c_read16(nvhdcp, 0x41, b_status, true);
 }
 
 int tegra_nvhdcp_set_policy(struct tegra_nvhdcp *nvhdcp, int pol)

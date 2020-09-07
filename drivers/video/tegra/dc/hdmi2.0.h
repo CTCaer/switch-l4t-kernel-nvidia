@@ -1,7 +1,7 @@
 /*
  * hdmi2.0.h: hdmi2.0 driver.
  *
- * Copyright (c) 2014-2018, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2019, NVIDIA CORPORATION, All rights reserved.
  * Author: Animesh Kishore <ankishore@nvidia.com>
  *
  * This software is licensed under the terms of the GNU General Public
@@ -25,16 +25,50 @@
 #define HDMI_HDR_INFOFRAME_STOP_TIMEOUT_MS	(2000)
 #define HDMI_HPD_DEBOUNCE_WAR_DELAY_MS	(4000)
 
+#define HDMI_MONITOR_FAST_TIMEOUT_MS (5)
+#define HDMI_MONITOR_SLOW_TIMEOUT_MS (250)
+
 /* SCDC block */
+#define HDMI_SCDC_UPDATE_FLAGS			(0x10)
+#define HDMI_SCDC_UPDATE_FLAGS_STATUS   (0x1)
+#define HDMI_SCDC_UPDATE_FLAGS_CED      (0x2)
+#define HDMI_SCDC_UPDATE_FLAGS_MASK     (\
+	HDMI_SCDC_UPDATE_FLAGS_STATUS | \
+	HDMI_SCDC_UPDATE_FLAGS_CED)
+
 #define HDMI_SCDC_TMDS_CONFIG_OFFSET	(0x20)
 #define HDMI_SCDC_TMDS_CONFIG_SCRAMBLING_EN	(1)
 #define HDMI_SCDC_TMDS_CONFIG_SCRAMBLING_DIS	(1)
 #define HDMI_SCDC_TMDS_CONFIG_BIT_CLK_RATIO_10	(0 << 1)
 #define HDMI_SCDC_TMDS_CONFIG_BIT_CLK_RATIO_40	(1 << 1)
 
-#define HDMI_SCDC_STATUS_FLAGS	(0x21)
-#define HDMI_SCDC_STATUS_FLAGS_SCRAMBLING_EN	(1)
-#define HDMI_SCDC_STATUS_FLAGS_SCRAMBLING_DIS	(0)
+#define HDMI_SCDC_TMDS_SCRAMBLER_STATUS_FLAGS	(0x21)
+#define HDMI_SCDC_TMDS_SCRAMBLER_STATUS_FLAGS_SCRAMBLING_STATUS_MASK	(1 << 0)
+
+#define HDMI_SCDC_STATUS_FLAGS					(0x40)
+#define HDMI_SCDC_STATUS_FLAGS_CLOCK_DETECTED_MASK	(1 << 0)
+#define HDMI_SCDC_STATUS_FLAGS_CH0_LN0_LOCKED_MASK	(1 << 1)
+#define HDMI_SCDC_STATUS_FLAGS_CH1_LN1_LOCKED_MASK	(1 << 2)
+#define HDMI_SCDC_STATUS_FLAGS_CH2_LN2_LOCKED_MASK	(1 << 3)
+#define HDMI_SCDC_STATUS_FLAGS_TMDS_LOCKED_MASK		(\
+	HDMI_SCDC_STATUS_FLAGS_CLOCK_DETECTED_MASK | \
+	HDMI_SCDC_STATUS_FLAGS_CH0_LN0_LOCKED_MASK | \
+	HDMI_SCDC_STATUS_FLAGS_CH1_LN1_LOCKED_MASK | \
+	HDMI_SCDC_STATUS_FLAGS_CH2_LN2_LOCKED_MASK)
+
+#define HDMI_SCDC_CHARACTER_ERROR_DETECTION		(0x50)
+
+#define HDMI_SCDC_CED_SCORE_PENALTY				5
+#define HDMI_SCDC_CED_SCORE_MAX					9
+#define HDMI_SCDC_RETRY_COUNT_MAX				100
+#define HDMI_SCDC_CED_FALLBACK_MAX				10
+
+enum link_supervisor_state_type {
+	LINK_SUPERVISOR_STATE_WAIT_FOR_SCDC_STATUS_LOCKED = 0,
+	LINK_SUPERVISOR_STATE_WAIT_FOR_HDCP_READY = 1,
+	LINK_SUPERVISOR_STATE_READ_UPDATES = 2,
+	LINK_SUPERVISOR_STATE_INACTIVE = 3,
+};
 
 enum {
 	HDMI_INFOFRAME_TYPE_VENDOR = 0x81,
@@ -43,6 +77,8 @@ enum {
 	HDMI_INFOFRAME_TYPE_AUDIO = 0x84,
 	HDMI_INFOFRAME_TYPE_MPEG_SRC = 0x85,
 	HDMI_INFOFRAME_TYPE_HDR = 0x87,
+	/* DV infoframe type same as vendor. Adding just for clarity */
+	HDMI_INFOFRAME_TYPE_DV = 0x81,
 };
 
 enum {
@@ -52,6 +88,7 @@ enum {
 	HDMI_INFOFRAME_VS_AUDIO = 0x1,
 	HDMI_INFOFRAME_VS_MPEG_SRC = 0x1,
 	HDMI_INFOFRAME_VS_HDR = 0x1,
+	HDMI_INFOFRAME_VS_DV = 0x1,
 };
 
 /* excluding checksum and header bytes */
@@ -62,6 +99,7 @@ enum {
 	HDMI_INFOFRAME_LEN_AUDIO = 10,
 	HDMI_INFOFRAME_LEN_MPEG_SRC = 10,
 	HDMI_INFOFRAME_LEN_HDR = 26,
+	HDMI_INFOFRAME_LEN_DV = 27,
 };
 
 enum {
@@ -364,7 +402,10 @@ struct hdmi_audio_infoframe {
 	u32 reg_hole1:16;
 } __packed;
 
-#define HDMI_LICENSING_LLC_OUI	(0x000c03)
+#define HDMI_LICENSING_LLC_OUI		(0x000c03)
+#define DV_IEEE_LLC_OUI			(0x00D046)
+#define HDMI_INFOFRAME_LEN_VENDOR_LLC	(6)
+#define HDMI_INFOFRAME_LEN_VENDOR_DV	(24)
 
 enum {
 	HDMI_VENDOR_VIDEO_FORMAT_NONE,
@@ -394,6 +435,54 @@ struct hdmi_vendor_infoframe {
 	/* PB6 */
 	u32 res3:4;
 	u32 ext_data_3d:4;
+
+	/*PB7-PB24*/
+	u32 res4:32;
+	u32 res5:32;
+	u32 res6:32;
+	u32 res7:32;
+	u16 res8:16;
+} __packed;
+
+/* all fields little endian */
+struct hdmi_dv_infoframe {
+	/* PB0 */
+	u32 csum:8;
+
+	/* PB1, PB2, PB3 */
+	u32 oui:24;	/* organizationally unique identifier */
+
+	/* PB4 */
+	u32 low_latency:1;
+	u32 dolby_vision_signal:1;
+	u32 res1:6;
+
+	/* PB5 */
+	u32 eff_tmax_pq_high:4;
+	u32 res2:2;
+	u32 auxilary_md_present:1;
+	u32 backlight_ctrl_md_present:1;
+
+	/* PB6 */
+	u32 eff_tmax_pq_low:8;
+
+	/* PB7 */
+	u32 auxilary_run_mode:8;
+
+	/* PB8 */
+	u32 auxilary_run_version:8;
+
+	/* PB9 */
+	u32 auxilary_debug:8;
+
+	/*PB10-PB27*/
+	u32 res3:32;
+	u32 res4:32;
+	u32 res5:32;
+	u32 res6:32;
+	u32 res7:32;
+	u32 res8:32;
+	u32 res9:32;
 } __packed;
 
 enum {
@@ -422,9 +511,13 @@ struct tegra_hdmi {
 	struct tegra_hdmi_out *pdata;
 	struct hdmi_avi_infoframe avi;
 	struct hdmi_hdr_infoframe hdr;
+	struct hdmi_dv_infoframe dv;
 	struct hdmi_spd_infoframe spd;
+	u8 hdmi_dv_signal;
 	bool enabled;
 	atomic_t clock_refcount;
+
+	bool avmute; /* false: avmute clear, true: avmute set */
 
 	bool dvi;
 
@@ -437,12 +530,21 @@ struct tegra_hdmi {
 	bool mon_spec_valid;
 
 	u8 avi_colorimetry;
+	u8 avi_color_components;
+	u8 avi_color_quant;
 
 	struct tegra_edid *edid;
 	struct i2c_client *ddc_i2c_client;
 
 	struct i2c_client *scdc_i2c_client;
 	struct delayed_work scdc_work;
+
+	enum link_supervisor_state_type link_supervisor_state;
+	struct delayed_work link_supervisor_work;
+	u8 scdc_ced_score;
+	u8 scdc_retry_count;
+	u8 hpd_reset_work_count;
+	struct delayed_work hpd_reset_work;
 
 	struct i2c_client *ddcci_i2c_client;
 
