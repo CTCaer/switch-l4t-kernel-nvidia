@@ -1,7 +1,7 @@
 /*
 * sor_regs.h: sor register definitions.
 *
-* Copyright (c) 2011-2018, NVIDIA CORPORATION, All rights reserved.
+* Copyright (c) 2011-2019, NVIDIA CORPORATION, All rights reserved.
 *
 * This software is licensed under the terms of the GNU General Public
 * License version 2, as published by the Free Software Foundation, and
@@ -1052,6 +1052,9 @@
 #define NV_SOR_HDMI_GCP_STATUS_ACTIVE_END_PP_SHIFT	(8)
 #define NV_SOR_HDMI_GCP_STATUS_ACTIVE_END_PP_MASK	(0x7)
 #define NV_SOR_HDMI_GCP_SUBPACK(i)			(0xc5 + i)
+#define NV_SOR_HDMI_GCP_SUBPACK_SB0_SET_AVMUTE	(1 << 0)
+#define NV_SOR_HDMI_GCP_SUBPACK_SB0_CLR_AVMUTE	(1 << 4)
+#define NV_SOR_HDMI_GCP_SUBPACK_SB0_SHIFT		(0)
 #define NV_SOR_HDMI_GCP_SUBPACK_SB1_SHIFT		(8)
 #define NV_SOR_HDMI_GCP_SUBPACK_SB2_SHIFT		(16)
 #define NV_SOR_INPUT_CONTROL				0xe8

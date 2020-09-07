@@ -2498,6 +2498,11 @@ wl_handle_private_cmd(struct net_device *net, char *command, u32 buf_size)
 	}
 	else if (brcm_strnicmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
 		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
+		struct bcm_cfg80211 *cfg;
+
+		cfg = wiphy_priv(net->ieee80211_ptr->wiphy);
+		wl_scan_abort(cfg);
+
 		bytes_written = wldev_set_band(net, band);
 	} else if (strnicmp(command, CMD_UPDATE_CHANNEL_LIST,
 		strlen(CMD_UPDATE_CHANNEL_LIST)) == 0) {

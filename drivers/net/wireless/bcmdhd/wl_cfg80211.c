@@ -4589,6 +4589,13 @@ static void wl_cfg80211_wait_for_disconnection(struct bcm_cfg80211 *cfg, struct 
 	}
 	if (wl_get_drv_status(cfg, DISCONNECTING, dev)) {
 		WL_ERR(("Force clear DISCONNECTING status!\n"));
+		wl_clr_drv_status(cfg, CONNECTED, dev);
+		CFG80211_DISCONNECTED(dev, WLAN_REASON_UNSPECIFIED, NULL, 0,
+					false, GFP_KERNEL);
+		wl_link_down(cfg);
+		wl_init_prof(cfg, dev);
+		WL_ERR(("CONNECTING?=%d\n",
+			wl_get_drv_status(cfg, CONNECTING, dev)));
 		wl_clr_drv_status(cfg, DISCONNECTING, dev);
 	}
 
@@ -4657,7 +4664,6 @@ wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 					WL_ERR(("error (%d)\n", err));
 					return err;
 				}
-				wl_cfg80211_wait_for_disconnection(cfg, dev);
 		}
 		reinit_completion(&cfg->send_disconnected);
 		/* Wait till link down event is received from FW */
@@ -4666,6 +4672,8 @@ wl_cfg80211_disconnect(struct wiphy *wiphy, struct net_device *dev,
 			msecs_to_jiffies(DISCONNECT_WAIT_TIME));
 		if (!ret) {
 			WL_ERR(("Link down event is not received\n"));
+			// Wait for link down event and clear sme flags
+			wl_cfg80211_wait_for_disconnection(cfg, dev);
 		} else if (ret == -ERESTARTSYS) {
 			WL_ERR(("Wait aborted by a signal\n"));
 		}
@@ -13038,6 +13046,14 @@ static int wl_construct_reginfo(struct bcm_cfg80211 *cfg, s32 bw_cap)
 	return err;
 }
 
+void wl_scan_abort(struct bcm_cfg80211 *cfg)
+{
+	if (!cfg)
+		cfg = g_bcm_cfg;
+
+	wl_cfg80211_scan_abort(cfg);
+}
+
 s32 wl_update_wiphybands(struct bcm_cfg80211 *cfg, bool notify)
 {
 	struct wiphy *wiphy;
@@ -15118,6 +15134,10 @@ wl_cfg80211_ch_switch_notify(struct net_device *dev, uint16 chanspec, struct wip
 {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0))
 	struct cfg80211_chan_def chandef;
+	struct wlc_ssid *ssid = NULL;
+	u8 *bssid = 0;
+	struct cfg80211_bss *bss = NULL;
+	struct bcm_cfg80211 *cfg = NULL;
 #elif (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 5, 0) && (LINUX_VERSION_CODE <= (3, 7, \
 	\
 	0)))
@@ -15146,6 +15166,24 @@ wl_cfg80211_ch_switch_notify(struct net_device *dev, uint16 chanspec, struct wip
 	0)))
 	cfg80211_ch_switch_notify(dev, chan_info.freq, chan_info.chan_type);
 #endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0)) */
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0))
+	/* Update cfg80211 BSS Channel */
+	cfg = wiphy_priv(wiphy);
+	if (!cfg)
+		return;
+	ssid = (struct wlc_ssid *)wl_read_prof(cfg, dev, WL_PROF_SSID);
+	bssid = (u8 *)wl_read_prof(cfg, dev, WL_PROF_BSSID);
+	if (ssid && bssid) {
+		bss = CFG80211_GET_BSS(wiphy, NULL, bssid,
+			ssid->SSID, ssid->SSID_len);
+		if (bss) {
+			bss->channel = chandef.chan;
+			CFG80211_PUT_BSS(wiphy, bss);
+		}
+	}
+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION (3, 8, 0)) */
+
 	return;
 }
 

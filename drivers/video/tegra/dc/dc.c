@@ -3596,6 +3596,35 @@ void tegra_dc_cmu_enable(struct tegra_dc *dc, bool cmu_enable)
 }
 EXPORT_SYMBOL(tegra_dc_cmu_enable);
 
+void tegra_dc_link_supervisor_control(struct tegra_dc *dc, bool enable)
+{
+	mutex_lock(&dc->lock);
+
+	if (dc->out_ops->link_supervisor_control)
+		dc->out_ops->link_supervisor_control(dc, enable);
+
+	mutex_unlock(&dc->lock);
+}
+
+bool tegra_dc_is_link_supervisor_activated(struct tegra_dc *dc)
+{
+	bool enabled = false;
+
+	mutex_lock(&dc->lock);
+
+	if (!dc->enabled) {
+		mutex_unlock(&dc->lock);
+		return false;
+	}
+
+	if (dc->out_ops->is_link_supervisor_activated)
+		enabled = dc->out_ops->is_link_supervisor_activated(dc);
+
+	mutex_unlock(&dc->lock);
+
+	return enabled;
+}
+
 static void tegra_dc_cache_cmu(struct tegra_dc *dc,
 				struct tegra_dc_cmu *src_cmu)
 {
