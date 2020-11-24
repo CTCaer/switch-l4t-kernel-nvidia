@@ -33,6 +33,7 @@
 
 #include <soc/tegra/kfuse.h>
 #include <soc/tegra/fuse.h>
+#include <linux/trusty/trusty.h>
 #include <linux/trusty/trusty_ipc.h>
 #include <linux/ote_protocol.h>
 
@@ -2254,6 +2255,15 @@ void tegra_nvhdcp_set_plug(struct tegra_nvhdcp *nvhdcp, bool hpd)
 			return;
 		}
 	}
+
+	/* Disable hdcp if no trusted os is running  */
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+	if (!te_is_secos_dev_enabled() && !is_trusty_dev_enabled())
+		return;
+#else
+	if (!is_trusty_dev_enabled())
+		return;
+#endif
 
 	nvhdcp_debug("hdmi hotplug detected (hpd = %d)\n", hpd);
 
