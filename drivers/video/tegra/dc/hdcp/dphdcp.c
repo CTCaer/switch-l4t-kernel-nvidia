@@ -41,6 +41,8 @@
 #include "nvhdcp_hdcp22_methods.h"
 #include "tsec/tsec.h"
 
+#include <linux/ote_protocol.h>
+#include <linux/trusty/trusty.h>
 #if (defined(CONFIG_TRUSTY))
 #include <linux/trusty/trusty_ipc.h>
 #endif
@@ -2136,6 +2138,16 @@ void tegra_dphdcp_set_plug(struct tegra_dphdcp *dphdcp, bool hpd)
 			return;
 		}
 	}
+
+	/* Disable hdcp if no trusted os is running  */
+#ifdef CONFIG_TRUSTED_LITTLE_KERNEL
+	if (!te_is_secos_dev_enabled() && !is_trusty_dev_enabled())
+		return;
+#else
+	if (!is_trusty_dev_enabled())
+		return;
+#endif
+
 	/* ensure all previous values are reset on hotplug */
 	vprime_check_done = false;
 	repeater_flag = false;
