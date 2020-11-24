@@ -684,6 +684,9 @@ static int __init tlk_driver_misc_init(void)
 {
 	int ret;
 
+	if (!get_tlk_device_node())
+		return -ENODEV;
+
 	ret = misc_register(&tlk_misc_device);
 	if (ret)
 		pr_err("%s: misc_register failed: %d\n", __func__, ret);
@@ -693,6 +696,9 @@ static int __init tlk_driver_misc_init(void)
 
 static void __exit tlk_driver_misc_exit(void)
 {
+	if (!get_tlk_device_node())
+		return;
+
 	misc_deregister(&tlk_misc_device);
 }
 
