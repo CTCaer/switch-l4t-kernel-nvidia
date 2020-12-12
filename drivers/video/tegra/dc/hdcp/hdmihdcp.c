@@ -1,7 +1,7 @@
 /*
  * hdmihdcp.c: hdmi hdcp functions.
  *
- * Copyright (c) 2014-2019, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2014-2020, NVIDIA CORPORATION, All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -28,6 +28,7 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/tsec.h>
+#include <linux/of.h>
 
 #include <soc/tegra/kfuse.h>
 #include <soc/tegra/fuse.h>
@@ -1517,7 +1518,7 @@ static void nvhdcp_fallback_worker(struct work_struct *work)
 	}
 }
 
-static void nvhdcp_downstream_worker(struct work_struct *work)
+void nvhdcp_downstream_worker(struct work_struct *work)
 {
 	struct tegra_nvhdcp *nvhdcp =
 		container_of(to_delayed_work(work), struct tegra_nvhdcp, work);
@@ -2154,6 +2155,30 @@ err:
 	return;
 }
 
+static int dts_hdcp14_enabled_val = 0;
+static void tegra_get_hdcp14_enabled_status(void)
+{
+	struct device_node *reset_info;
+	u32 prop_val = 0;
+	int err;
+
+	reset_info = of_find_node_by_path("/chosen");
+	if (reset_info) {
+		err = of_property_read_u32(reset_info, "hdcp14enabled",
+				&prop_val);
+		if (err < 0)
+			goto out;
+		else {
+			nvhdcp_info("dts: force HDCP1.4 enabled? reg: 0x%x\n",
+					prop_val);
+			dts_hdcp14_enabled_val = prop_val;
+		}
+
+	}
+out:
+	return;
+}
+
 static int tegra_nvhdcp_on(struct tegra_nvhdcp *nvhdcp)
 {
 	u8 hdcp2version = 0;
@@ -2168,6 +2193,25 @@ static int tegra_nvhdcp_on(struct tegra_nvhdcp *nvhdcp)
 		!(tegra_edid_get_quirks(nvhdcp->hdmi->edid) &
 		  TEGRA_EDID_QUIRK_NO_HDCP)) {
 		nvhdcp->fail_count = 0;
+
+		if (dts_hdcp14_enabled_val == 1) {
+			nvhdcp_info("force to use HDCP1.4!\n");
+
+			val = HDCP_EESS_ENABLE<<31|
+				HDCP1X_EESS_START<<16|
+				HDCP1X_EESS_END;
+			tegra_sor_writel_ext(nvhdcp->hdmi->sor, HDMI_VSYNC_WINDOW,
+						val);
+			INIT_DELAYED_WORK(&nvhdcp->work,
+				nvhdcp_downstream_worker);
+			nvhdcp->hdcp22 = HDCP1X_PROTOCOL;
+
+			queue_delayed_work(nvhdcp->downstream_wq, &nvhdcp->work,
+					msecs_to_jiffies(delay));
+			return 0;
+		}
+
+		nvhdcp_info("normal nvhdcp working flow\n");
 		e = nvhdcp_i2c_read8(nvhdcp, HDCP_HDCP2_VERSION, &hdcp2version);
 		if (e)
 			nvhdcp_err("nvhdcp i2c HDCP22 version read failed\n");
@@ -2508,6 +2552,8 @@ struct tegra_nvhdcp *tegra_nvhdcp_create(struct tegra_hdmi *hdmi,
 
 	nvhdcp_head[id] = nvhdcp;
 	nvhdcp_vdbg("%s(): created misc device %s\n", __func__, nvhdcp->name);
+
+	tegra_get_hdcp14_enabled_status();
 
 	return nvhdcp;
 free_workqueue:
