@@ -112,7 +112,7 @@ static void therm_fan_est_work_func(struct work_struct *work)
 			/* temperature is rising */
 			read_lock(&est->state_lock);
 			for (trip_index = 0;
-				trip_index < (MAX_ACTIVE_STATES + 1); trip_index++) {
+				trip_index < est->trip_length; trip_index++) {
 				if (est->cur_temp < est->active_trip_temps[trip_index])
 					break;
 			}
@@ -131,23 +131,16 @@ static void therm_fan_est_work_func(struct work_struct *work)
 			/* temperature is cooling */
 			read_lock(&est->state_lock);
 			for (trip_index = 1;
-				trip_index < MAX_ACTIVE_STATES; trip_index++) {
+				trip_index < est->trip_length; trip_index++) {
 				if (est->cur_temp < (est->active_trip_temps[trip_index]
 					- est->active_hysteresis[trip_index]))
 					break;
 			}
 			read_unlock(&est->state_lock);
 
-			if (est->use_tmargin) {
-				if (est->current_trip_level < trip_index
-					&& est->current_trip_level != (trip_index - 1))
-					update_flag = true;
-			} else {
-				if (est->current_trip_level >= trip_index
-					&& est->current_trip_level != (trip_index - 1)
-					&& trip_index != (MAX_ACTIVE_STATES + 1))
-					update_flag = true;
-			}
+			if (est->current_trip_level >= trip_index
+				&& est->current_trip_level != (trip_index - 1))
+				update_flag = true;
 		}
 
 		if (update_flag) {
@@ -204,7 +197,7 @@ static int therm_fan_est_bind(struct thermal_zone_device *thz,
 	int i;
 	struct therm_fan_estimator *est = thz->devdata;
 	if (!strcmp(cdev->type, est->cdev_type)) {
-		for (i = 0; i < MAX_ACTIVE_STATES; i++)
+		for (i = 0; i < est->trip_length; i++)
 			thermal_zone_bind_cooling_device(thz, i, cdev, i, i,
 					THERMAL_WEIGHT_DEFAULT);
 	}
@@ -223,7 +216,7 @@ static int therm_fan_est_unbind(struct thermal_zone_device *thz,
 	int i;
 	struct therm_fan_estimator *est = thz->devdata;
 	if (!strcmp(cdev->type, est->cdev_type)) {
-		for (i = 0; i < MAX_ACTIVE_STATES; i++)
+		for (i = 0; i < est->trip_length; i++)
 			thermal_zone_unbind_cooling_device(thz, i, cdev);
 	}
 
@@ -527,7 +520,7 @@ static ssize_t set_fan_profile(struct device *dev,
 	memcpy(est->active_hysteresis, est->fan_profile_trip_hysteresis[profile_index],
 			sizeof(s32) * MAX_ACTIVE_STATES);
 
-	for (i = 1; i < MAX_ACTIVE_STATES; i++)
+	for (i = 1; i < est->trip_length; i++)
 		fan_set_trip_temp_hyst(est, i,
 			est->active_hysteresis[i],
 			est->active_trip_temps[i]);
@@ -962,10 +955,10 @@ static int therm_fan_est_probe(struct platform_device *pdev)
 			i, est_data->active_trip_temps[i],
 			est_data->active_hysteresis[i]);
 
-	for (i = 1; i < MAX_ACTIVE_STATES; i++) {
+	for (i = 1; i < est_data->trip_length; i++) {
 		fan_set_trip_temp_hyst(est_data, i, est_data->active_hysteresis[i],
 			est_data->active_trip_temps[i]);
-		if (((i + 1) < MAX_ACTIVE_STATES)
+		if (((i + 1) < est_data->trip_length)
 			&& ((est_data->active_trip_temps[i] - est_data->active_hysteresis[i])
 			>= (est_data->active_trip_temps[i + 1] - est_data->active_hysteresis[i + 1]))) {
 			pr_err("THERMAL EST: active hysteresis invalid\n");
@@ -973,7 +966,7 @@ static int therm_fan_est_probe(struct platform_device *pdev)
 			goto free_subdevs;
 		}
 	}
-	for (i = 0; i < MAX_ACTIVE_STATES; i++)
+	for (i = 0; i < est_data->trip_length; i++)
 		pr_debug("THERMAL EST index %d: trip_temps_hyst %d\n",
 			i, est_data->active_trip_temps[i] - est_data->active_hysteresis[i]);
 
