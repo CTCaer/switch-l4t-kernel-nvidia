@@ -1469,6 +1469,9 @@ static int pwm_fan_resume(struct platform_device *pdev)
 
 	gpio_free(fan_data->pwm_gpio);
 
+	set_pwm_duty_cycle(1, fan_data);
+	set_pwm_duty_cycle(0, fan_data);
+
 	queue_delayed_work(fan_data->workqueue,
 			&fan_data->fan_ramp_work,
 			msecs_to_jiffies(fan_data->step_time));
