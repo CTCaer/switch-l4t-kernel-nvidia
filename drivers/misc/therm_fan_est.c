@@ -588,6 +588,9 @@ static int therm_fan_est_probe(struct platform_device *pdev)
 	struct device_node *data_node = NULL;
 	struct device_node *base_profile_node = NULL;
 	struct device_node *profile_node = NULL;
+#if IS_ENABLED(CONFIG_THERMAL_GOV_CONTINUOUS)
+	struct device_node *gov_node = NULL;
+#endif
 	const char *default_profile = NULL;
 	int child_count = 0;
 	struct device_node *child = NULL;
@@ -895,7 +898,17 @@ static int therm_fan_est_probe(struct platform_device *pdev)
 			err = -EINVAL;
 			goto free_tzp;
 		}
-	} else
+#if IS_ENABLED(CONFIG_THERMAL_GOV_CONTINUOUS)
+		gov_node = of_get_child_by_name(node, "thermal-zone-params");
+		err = continuous_thermal_gov_update_params(tzp, gov_node);
+		if (err || !tzp->governor_params) {
+			err = -EINVAL;
+			pr_err("failed to update governor data");
+			goto free_tzp;
+		}
+#endif
+	}
+	else
 		value = 0;
 
 	est_data->tzp = tzp;
