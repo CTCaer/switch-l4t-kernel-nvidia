@@ -948,6 +948,7 @@ irqreturn_t fan_tach_isr(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+
 static int pwm_fan_probe(struct platform_device *pdev)
 {
 	int i;
@@ -1354,12 +1355,12 @@ static int pwm_fan_probe(struct platform_device *pdev)
 			fan_data->fan_state_cap_lookup[i]);
 	}
 	hwmon = devm_hwmon_device_register_with_groups(&pdev->dev, "tegra_pwmfan", fan_data, pwm_fan_groups);
-        if (IS_ERR(hwmon)) {
-                dev_err(&pdev->dev, "Failed to register hwmon device\n");
-                pwm_disable(fan_data->pwm_dev);
-                err = PTR_ERR(hwmon);
+	if (IS_ERR(hwmon)) {
+		dev_err(&pdev->dev, "Failed to register hwmon device\n");
+			pwm_disable(fan_data->pwm_dev);
+		err = PTR_ERR(hwmon);
 		goto hwmon_fail;
-        }
+	}
 	return err;
 
 hwmon_fail:
@@ -1468,6 +1469,19 @@ static int pwm_fan_resume(struct platform_device *pdev)
 	mutex_lock(&fan_data->fan_state_lock);
 
 	gpio_free(fan_data->pwm_gpio);
+
+	/* 
+	 * Some boards share the same regulator with fan and it
+	 * can set the fan to 100% with inverted PWM. In such 
+	 * cases we need to enable PWM and set duty back to 0.
+	 * pwm_config checks current state and does not allow
+	 * setting the same value. Bypass the check by setting an
+	 * arbitrary value and then setting it back to 0%.
+	 */
+	if (fan_data->fan_pwm_polarity == PWM_POLARITY_INVERSED) {
+		set_pwm_duty_cycle(1, fan_data);
+		set_pwm_duty_cycle(0, fan_data);
+	}
 
 	queue_delayed_work(fan_data->workqueue,
 			&fan_data->fan_ramp_work,
