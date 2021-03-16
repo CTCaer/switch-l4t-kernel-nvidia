@@ -85,6 +85,7 @@ struct continuous_thermal_gov_attribute {
 struct continuous_thermal_governor {
 	struct kobject kobj;
 	struct continuous_thermal_gov_params pm;
+	struct thermal_zone_device *tz;
 
 	int trip;
 	int sta;
@@ -104,7 +105,7 @@ struct continuous_thermal_governor {
 	(t->governor_data)
 
 #define gov_to_tz(g)		\
-	container_of((void *)g, struct thermal_zone_device, governor_data)
+	(g->tz)
 
 #define kobj_to_gov(k)		\
 	container_of(k, struct continuous_thermal_governor, kobj)
@@ -422,6 +423,7 @@ static int continuous_thermal_gov_bind(struct thermal_zone_device *tz)
 	if (!gov->pm.iir_lower_width)
 		gov->pm.iir_upper_width = LOWER_WIDTH;
 
+	gov->tz = tz;
 	gov->trip = tz->trips;
 
 	if (!tz->ops || !tz->ops->get_trip_temp || !tz->ops->get_trip_hyst)
