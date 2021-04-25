@@ -215,7 +215,7 @@ struct nvhost_device_data t21_msenc_info = {
 	.borps_val		= 0x2008,
 	.actmon_enabled		= true,
 	.firmware_name		= "nvhost_nvenc050.fw",
-	.resource_policy	= RESOURCE_PER_DEVICE,
+	.resource_policy	= RESOURCE_PER_CHANNEL_INSTANCE,
 	.serialize		= true,
 	.bond_out_id		= BOND_OUT_NVENC,
 #if defined(CONFIG_TEGRA_BWMGR)
@@ -250,7 +250,7 @@ struct nvhost_device_data t21_nvdec_info = {
 	.borps_addr		= 0x00001650,
 	.borps_val		= 0x2008,
 	.actmon_enabled		= true,
-	.resource_policy	= RESOURCE_PER_DEVICE,
+	.resource_policy	= RESOURCE_PER_CHANNEL_INSTANCE,
 	.serialize		= true,
 	.bond_out_id		= BOND_OUT_NVDEC,
 #if defined(CONFIG_TEGRA_BWMGR)
@@ -290,7 +290,7 @@ struct nvhost_device_data t21_nvjpg_info = {
 	.borps_val		= 0x2008,
 	.actmon_enabled		= true,
 	.bond_out_id		= BOND_OUT_NVJPG,
-	.resource_policy	= RESOURCE_PER_DEVICE,
+	.resource_policy	= RESOURCE_PER_CHANNEL_INSTANCE,
 	.serialize		= true,
 	.firmware_name		= "nvhost_nvjpg010.fw",
 #if defined(CONFIG_TEGRA_BWMGR)
@@ -396,7 +396,7 @@ struct nvhost_device_data t21_vic_info = {
 	.firmware_name		= "vic04_ucode.bin",
 	.bond_out_id		= BOND_OUT_VIC,
 	.aggregate_constraints	= nvhost_vic_aggregate_constraints,
-	.resource_policy	= RESOURCE_PER_DEVICE,
+	.resource_policy	= RESOURCE_PER_CHANNEL_INSTANCE,
 	.num_ppc		= 8,
 #if defined(CONFIG_TEGRA_BWMGR)
 	.bwmgr_client_id	= TEGRA_BWMGR_CLIENT_VIC,
