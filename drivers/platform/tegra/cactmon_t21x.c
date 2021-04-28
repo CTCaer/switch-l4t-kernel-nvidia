@@ -435,6 +435,26 @@ static int tegra21x_actmon_remove(struct platform_device *pdev)
 	return 0;
 }
 
+#ifdef CONFIG_PM
+static int tegra21x_actmon_suspend(struct platform_device *pdev, pm_message_t state)
+{
+	/* Nothing to do */
+	return 0;
+}
+
+static int tegra21x_actmon_resume(struct platform_device *pdev)
+{
+	struct device *mon_dev = &pdev->dev;
+	int ret = 0;
+
+	ret = tegra_actmon_resume();
+	if (ret)
+		dev_err(mon_dev, "unable to resume actmon\n");
+
+	return ret;
+}
+#endif /* CONFIG_PM */
+
 static const struct of_device_id tegra21x_actmon_of[] = {
 	{ .compatible = "nvidia,tegra210-cactmon", .data = NULL, },
 	{},
@@ -443,6 +463,10 @@ static const struct of_device_id tegra21x_actmon_of[] = {
 static struct platform_driver tegra21x_actmon_driver __refdata = {
 	.probe		= tegra21x_actmon_probe,
 	.remove		= tegra21x_actmon_remove,
+#ifdef CONFIG_PM
+	.suspend = tegra21x_actmon_suspend,
+	.resume = tegra21x_actmon_resume,
+#endif
 	.driver	= {
 		.name	= "tegra21x_actmon",
 		.owner	= THIS_MODULE,
