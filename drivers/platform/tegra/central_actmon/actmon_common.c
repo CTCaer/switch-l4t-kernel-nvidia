@@ -883,6 +883,32 @@ err_out:
 	return ret;
 }
 
+static int actmon_dev_reinit(struct actmon_dev *dev,
+		struct platform_device *pdev)
+{
+	unsigned long freq;
+	int ret = 0;
+
+	spin_lock_init(&dev->lock);
+
+	dev->state = ACTMON_UNINITIALIZED;
+
+	freq = dev->actmon_dev_get_rate(dev) / 1000;
+
+	ret = actmon_dev_configure(dev, freq);
+	if (ret) {
+		dev_err(mon_dev, "Failed %s configuration\n",
+			dev_name(&pdev->dev));
+		return ret;
+	}
+
+	disable_irq(actmon->virq);
+	dev->state = ACTMON_OFF;
+	actmon_dev_enable(dev);
+
+	return 0;
+}
+
 static int actmon_dev_init(struct actmon_dev *dev,
 		struct platform_device *pdev)
 {
@@ -1025,6 +1051,49 @@ static int actmon_reset_deinit(struct platform_device *pdev)
 
 	return ret;
 }
+
+int tegra_actmon_resume()
+{
+	struct platform_device *pdev = actmon->pdev;
+	int ret = 0;
+	u32 i;
+
+	ret = actmon_clock_enable(pdev);
+	if (ret)
+		return ret;
+
+	ret = actmon_reset_init(pdev);
+	if (ret)
+		goto err_reset;
+
+	ret = actmon_set_sample_prd(pdev);
+	if (ret)
+		goto err_sample;
+
+	if (actmon->ops.set_glb_intr)
+		actmon->ops.set_glb_intr(0xff, actmon->base);
+
+	for (i = 0; i < MAX_DEVICES; i++) {
+		if (!actmon->devices[i].dn)
+			break;
+
+		/* Re-initialize actmon devices */
+		ret = actmon_dev_reinit(&actmon->devices[i], pdev);
+		if (ret)
+			goto err_reset;
+	}
+
+	if (ret == 0)
+		return 0;
+
+err_reset:
+	actmon_reset_deinit(pdev);
+err_sample:
+	actmon_clock_disable(pdev);
+
+	return ret;
+}
+EXPORT_SYMBOL_GPL(tegra_actmon_resume);
 
 int tegra_actmon_register(struct actmon_drv_data *actmon_data)
 {
