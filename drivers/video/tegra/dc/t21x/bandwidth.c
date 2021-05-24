@@ -523,7 +523,7 @@ static void tegra_dc_process_bandwidth_renegotiate(struct tegra_dc *dc,
 
 /* uses the larger of w->bandwidth or w->new_bandwidth */
 static int tegra_dc_handle_latency_allowance(struct tegra_dc *dc,
-	struct tegra_dc_win *w, int set_la, unsigned long *emc_freq_hz_limit)
+	struct tegra_dc_win *w, int set_la)
 {
 	int ret = 0;
 	unsigned long bw;
@@ -567,11 +567,6 @@ static int tegra_dc_handle_latency_allowance(struct tegra_dc *dc,
 			la_id_tab[dc->ndev->id][w->idx],
 			emc_freq_hz, bw, disp_params);
 
-		if (!err) {
-			/* la allowed, record emc freq required */
-			*emc_freq_hz_limit = emc_freq_hz;
-		}
-
 		next_freq = clk_round_rate(emc_clk, emc_freq_hz + 1000000);
 
 		if (emc_freq_hz == next_freq) {
@@ -588,16 +583,16 @@ static int tegra_dc_handle_latency_allowance(struct tegra_dc *dc,
 }
 
 static int tegra_dc_set_latency_allowance(struct tegra_dc *dc,
-	struct tegra_dc_win *w, unsigned long *emc_freq_hz_limit)
+	struct tegra_dc_win *w)
 {
-	return tegra_dc_handle_latency_allowance(dc, w, 1, emc_freq_hz_limit);
+	return tegra_dc_handle_latency_allowance(dc, w, 1);
 }
 
 #ifdef CONFIG_TEGRA_ISOMGR
 static int tegra_dc_check_latency_allowance(struct tegra_dc *dc,
 	struct tegra_dc_win *w)
 {
-	return tegra_dc_handle_latency_allowance(dc, w, 0, NULL);
+	return tegra_dc_handle_latency_allowance(dc, w, 0);
 }
 #endif
 
@@ -806,8 +801,6 @@ static inline unsigned long tegra_dc_kbps_to_emc(unsigned long bw)
 void tegra_dc_program_bandwidth(struct tegra_dc *dc, bool use_new)
 {
 	unsigned i;
-	unsigned long max_emc_freq_hz = 0;
-	unsigned long emc_freq_hz_limit = 0;
 
 	if (tegra_dc_is_nvdisplay())
 		return;
@@ -864,16 +857,10 @@ void tegra_dc_program_bandwidth(struct tegra_dc *dc, bool use_new)
 
 		if ((use_new || w->bandwidth != w->new_bandwidth) &&
 			w->new_bandwidth != 0)
-			tegra_dc_set_latency_allowance(dc, w,
-				&emc_freq_hz_limit);
+			tegra_dc_set_latency_allowance(dc, w);
 		trace_program_bandwidth(dc);
 		w->bandwidth = w->new_bandwidth;
-		if (max_emc_freq_hz < emc_freq_hz_limit)
-			max_emc_freq_hz = emc_freq_hz_limit;
 	}
-	if (max_emc_freq_hz)
-		tegra_bwmgr_set_emc(dc->emc_la_handle, max_emc_freq_hz,
-			 TEGRA_BWMGR_SET_EMC_FLOOR);
 }
 
 int tegra_dc_set_dynamic_emc(struct tegra_dc *dc)
