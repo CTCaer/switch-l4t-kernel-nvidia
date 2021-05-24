@@ -500,7 +500,7 @@ static int display_bw_mbps_set(void *data, u64 val)
 
 static int display_set_la_ptsa_set(void *data, u64 val)
 {
-	struct dc_to_la_params disp_params;
+	struct dc_to_la_params disp_params = {0};
 
 	if (cs.set_disp_la(ID(NVDISPLAYR),
 				debugfs_display_emc_freq_hz,
