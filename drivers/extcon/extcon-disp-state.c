@@ -131,8 +131,8 @@ static int disp_state_extcon_remove(struct platform_device *pdev)
 	struct disp_state_extcon_info *extcon_data = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
 
-	class_compat_unregister(switch_class);
 	class_compat_remove_link(switch_class, dev, NULL);
+	class_compat_unregister(switch_class);
 	extcon_dev_unregister(extcon_data->edev);
 	disp_extcon_info = NULL;
 	return 0;
