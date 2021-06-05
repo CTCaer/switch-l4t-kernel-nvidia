@@ -77,12 +77,16 @@ static int calc_h_ref_to_sync(const struct tegra_dc_mode *mode, int *href)
 	return 0;
 }
 
-static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode, int *vref)
+static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode,
+	int type, int *vref)
 {
 	long a;
 
 	/* Constraint 5: V_REF_TO_SYNC >= 1 */
-	a = mode->v_front_porch - 1;
+	if (type == TEGRA_DC_OUT_DSI)
+		a = 1;
+	else
+		a = mode->v_front_porch - 1;
 
 	/* Constraint 2: V_REF_TO_SYNC + V_SYNC_WIDTH + V_BACK_PORCH > 1 */
 	if (a + mode->v_sync_width + mode->v_back_porch <= 1)
@@ -105,13 +109,13 @@ static int calc_v_ref_to_sync(const struct tegra_dc_mode *mode, int *vref)
 	return 0;
 }
 
-static int calc_ref_to_sync(struct tegra_dc_mode *mode)
+static int calc_ref_to_sync(struct tegra_dc_mode *mode, int type)
 {
 	int ret;
 	ret = calc_h_ref_to_sync(mode, &mode->h_ref_to_sync);
 	if (ret)
 		return ret;
-	ret = calc_v_ref_to_sync(mode, &mode->v_ref_to_sync);
+	ret = calc_v_ref_to_sync(mode, type, &mode->v_ref_to_sync);
 	if (ret)
 		return ret;
 
@@ -372,12 +376,15 @@ static bool check_t21x_mode_timings(const struct tegra_dc *dc,
 			       struct tegra_dc_mode *mode, bool verbose)
 {
 	if ((mode->vmode & FB_VMODE_Y420) ||
-		(mode->vmode & FB_VMODE_Y420_ONLY))
+		(mode->vmode & FB_VMODE_Y420_ONLY)) {
+		mode->h_ref_to_sync = 1;
 		mode->v_ref_to_sync = 1;
+	}
 	else
-		calc_ref_to_sync(mode);
+		calc_ref_to_sync(mode, dc->out->type);
 
-	mode->h_ref_to_sync = 1;
+	if (dc->out->type != TEGRA_DC_OUT_DSI)
+		mode->h_ref_to_sync = 1;
 
 	if (dc->out->type == TEGRA_DC_OUT_DSI && dc->out->vrr) {
 		mode->h_ref_to_sync =
