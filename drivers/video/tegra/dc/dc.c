@@ -4090,7 +4090,7 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out,
  * in bootloader for L4T usecase.
  * Bug 200122858
  */
-#ifdef CONFIG_ANDROID
+#if defined(CONFIG_ANDROID) || defined(CONFIG_TEGRA_DSI_L4T_BL_INIT)
 	/*
 	 * Seamless supporting panels can work in seamless mode
 	 * only if BL initializes DC/DSI. If not, panel should
