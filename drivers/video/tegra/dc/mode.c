@@ -650,8 +650,9 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 		}
 	}
 
-	tegra_dc_writel(dc, PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(div),
-			DC_DISP_DISP_CLOCK_CONTROL);
+	if (dc->out->type != TEGRA_DC_OUT_DSI) /* TODO: MIPI clock cals */
+		tegra_dc_writel(dc, PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(div),
+				DC_DISP_DISP_CLOCK_CONTROL);
 
 #ifdef CONFIG_SWITCH
 	if (dc->switchdev_registered)
