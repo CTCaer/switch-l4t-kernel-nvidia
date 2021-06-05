@@ -192,6 +192,13 @@ config TEGRA_DSI
 	help
 	  Say Y here to enable the DSI panel.
 
+config TEGRA_DSI_L4T_BL_INIT
+	bool "Enable DSI panel bootloader init support."
+	depends on TEGRA_DSI
+	default n
+	help
+	  Say N here if unsure or bootloader has trouble initializing properly.
+
 config TEGRA_DSI2EDP_TC358767
 	bool "Enable DSI2EDP TC358767 bridge."
 	help
