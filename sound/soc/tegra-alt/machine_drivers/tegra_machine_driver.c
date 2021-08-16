@@ -85,7 +85,11 @@ static const int tegra_machine_srate_values[] = {
 static struct snd_soc_jack_pin tegra_machine_hp_jack_pins[] = {
 	{
 		.pin = "x Headphone Jack",
-		.mask = SND_JACK_HEADSET,
+		.mask = SND_JACK_HEADPHONE,
+	},
+	{
+		.pin = "x Mic Jack",
+		.mask = SND_JACK_MICROPHONE,
 	},
 };
 
@@ -416,8 +420,9 @@ static int tegra_machine_rt5640_init(struct snd_soc_pcm_runtime *rtd)
 	if (!jack)
 			return -ENOMEM;
 
-	err = snd_soc_card_jack_new(card, "Headphone Jack", SND_JACK_HEADPHONE,
-								jack, tegra_machine_hp_jack_pins, 1);
+	err = snd_soc_card_jack_new(card, "Headphone Jack", SND_JACK_HEADSET,
+								jack, tegra_machine_hp_jack_pins, 2);
+								
 	if (err) {
 			dev_err(card->dev, "Headphone Jack creation failed %d\n", err);
 			return err;
@@ -434,6 +439,9 @@ static int tegra_machine_rt5640_init(struct snd_soc_pcm_runtime *rtd)
 			dev_err(card->dev, "Failed to set jack for RT5640: %d\n", err);
 			return err;
 	}
+
+	/* single button supporting play/pause */
+	snd_jack_set_key(jack->jack, SND_JACK_BTN_0, KEY_PLAYPAUSE);
 
 	snd_soc_dapm_sync(&card->dapm);
 
