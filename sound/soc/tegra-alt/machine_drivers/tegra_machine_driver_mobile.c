@@ -167,7 +167,7 @@ static const struct snd_soc_dapm_widget tegra_machine_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("s Mic", NULL),
 };
 
-/*
+#if IS_ENABLED(CONFIG_SND_SOC_TEGRA186_ASRC_ALT)
 static struct snd_soc_pcm_stream tegra_machine_asrc_link_params[] = {
 	PARAMS(SNDRV_PCM_FMTBIT_S32_LE, 8),
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
@@ -176,11 +176,16 @@ static struct snd_soc_pcm_stream tegra_machine_asrc_link_params[] = {
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
 	PARAMS(SNDRV_PCM_FMTBIT_S16_LE, 2),
 };
-*/
+#endif
+
 static struct snd_soc_jack_pin tegra_machine_hp_jack_pins[] = {
 	{
 		.pin = "x Headphone Jack",
-		.mask = SND_JACK_HEADSET,
+		.mask = SND_JACK_HEADPHONE,
+	},
+	{
+		.pin = "x Mic Jack",
+		.mask = SND_JACK_MICROPHONE,
 	},
 };
 
@@ -571,8 +576,8 @@ static int tegra_machine_rt5640_init(struct snd_soc_pcm_runtime *rtd)
 	if (!jack)
 			return -ENOMEM;
 
-	err = snd_soc_card_jack_new(card, "Headphone Jack", SND_JACK_HEADPHONE,
-								jack, tegra_machine_hp_jack_pins, 1);
+	err = snd_soc_card_jack_new(card, "Headphone Jack", SND_JACK_HEADSET,
+								jack, tegra_machine_hp_jack_pins, 2);
 	if (err) {
 			dev_err(card->dev, "Headphone Jack creation failed %d\n", err);
 			return err;
@@ -589,6 +594,9 @@ static int tegra_machine_rt5640_init(struct snd_soc_pcm_runtime *rtd)
 			dev_err(card->dev, "Failed to set jack for RT5640: %d\n", err);
 			return err;
 	}
+
+	/* single button supporting play/pause */
+	snd_jack_set_key(jack->jack, SND_JACK_BTN_0, KEY_PLAYPAUSE);
 
 	snd_soc_dapm_sync(&card->dapm);
 
