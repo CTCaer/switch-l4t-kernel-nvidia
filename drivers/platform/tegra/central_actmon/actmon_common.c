@@ -437,7 +437,7 @@ static int actmon_debugfs_create_dev(struct actmon_dev *dev)
 {
 	struct dentry *dir, *d;
 
-	if (dev->state == ACTMON_UNINITIALIZED)
+	if (!dev->dev_name || dev->state == ACTMON_UNINITIALIZED)
 		return 0;
 
 	dir = debugfs_create_dir(dev->dev_name, dbgfs_root);
