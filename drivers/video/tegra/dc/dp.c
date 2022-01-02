@@ -1357,7 +1357,7 @@ static inline u32 tegra_dp_get_bpp(struct tegra_dc_dp_data *dp, u32 vmode)
 	} else if (yuv_flag & FB_VMODE_Y36) {
 		return 36;
 	} else {
-		dev_info(&dp->dc->ndev->dev, "%s: vmode=0x%x did not specify bpp\n",
+		dev_dbg(&dp->dc->ndev->dev, "%s: vmode=0x%x did not specify bpp\n",
 				__func__, vmode);
 		return dp->dc->out->depth ? dp->dc->out->depth : 24;
 	}
@@ -1632,7 +1632,7 @@ static void tegra_dp_link_cal(struct tegra_dc_dp_data *dp)
 		dev_info(&dp->dc->ndev->dev,
 			"DP: no %s prod settings node in device tree\n", prop);
 	} else if (err) {
-		dev_warn(&dp->dc->ndev->dev, "DP : Prod set failed\n");
+		dev_warn(&dp->dc->ndev->dev, "DP: Prod set failed\n");
 	}
 }
 

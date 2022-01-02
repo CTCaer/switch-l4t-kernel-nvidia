@@ -410,7 +410,7 @@ int tegra_dc_dpaux_read_chunk_locked(struct tegra_dc_dpaux_data *dpaux,
 		if ((*aux_stat & DPAUX_DP_AUXSTAT_REPLYTYPE_I2CDEFER) ||
 			(*aux_stat & DPAUX_DP_AUXSTAT_REPLYTYPE_DEFER)) {
 			if (defer_retries-- > 0) {
-				dev_info(&dpaux->dc->ndev->dev,
+				dev_dbg(&dpaux->dc->ndev->dev,
 					"dp: aux read defer (0x%x) -- %d\n",
 					*aux_stat, defer_retries);
 				/* clear the error bits */
@@ -530,7 +530,7 @@ int tegra_dc_dpaux_write_chunk_locked(struct tegra_dc_dpaux_data *dpaux,
 		if ((*aux_stat & DPAUX_DP_AUXSTAT_REPLYTYPE_I2CDEFER) ||
 			(*aux_stat & DPAUX_DP_AUXSTAT_REPLYTYPE_DEFER)) {
 			if (defer_retries-- > 0) {
-				dev_info(&dpaux->dc->ndev->dev,
+				dev_dbg(&dpaux->dc->ndev->dev,
 					"dp: aux write defer (0x%x) -- %d\n",
 					*aux_stat, defer_retries);
 				/* clear the error bits */
