@@ -242,7 +242,7 @@ static void get_lt_new_config(struct tegra_dp_lt_data *lt_data)
 	}
 
 	for (cnt = 0; cnt < n_lanes; cnt++)
-		pr_info("dp lt: new config: lane %d: "
+		pr_debug("dp lt: new config: lane %d: "
 			"vs level: %d, pe level: %d, pc2 level: %d\n",
 			cnt, vs[cnt], pe[cnt], pc2_supported ? pc[cnt] : 0);
 }
@@ -283,7 +283,7 @@ static void set_tx_pu(struct tegra_dp_lt_data *lt_data)
 				NV_SOR_DP_PADCTL_TX_PU_VALUE_SHIFT |
 				NV_SOR_DP_PADCTL_TX_PU_ENABLE));
 
-	pr_info("dp lt: tx_pu: 0x%x\n", max_tx_pu);
+	pr_debug("dp lt: tx_pu: 0x%x\n", max_tx_pu);
 }
 
 /*
@@ -354,7 +354,7 @@ static void set_lt_config(struct tegra_dp_lt_data *lt_data)
 					mask, (pc_reg << shift));
 		}
 
-		pr_info("dp lt: config: lane %d: "
+		pr_debug("dp lt: config: lane %d: "
 			"vs level: %d, pe level: %d, pc2 level: %d\n",
 			i, vs[i], pe[i], pc2_supported ? pc[i] : 0);
 	}
@@ -989,7 +989,7 @@ static void lt_worker(struct work_struct *work)
 	lt_data->pending_evt = 0;
 	mutex_unlock(&lt_data->lock);
 
-	pr_info("dp lt: state %d (%s), pending_lt_evt %d\n",
+	pr_info("dp lt: state %d (%s), pending lt event %d\n",
 		lt_data->state, tegra_dp_lt_state_names[lt_data->state],
 		pending_lt_evt);
 
