@@ -4252,7 +4252,7 @@ int tegra_dc_get_source_physical_address(u8 *phy_address)
 		dc = tegra_dc_get_dc(i);
 
 		if (dc && dc->enabled && dc->edid && dc->out &&
-			(dc->out->type == TEGRA_DC_OUT_HDMI))
+			(dc->out->type == TEGRA_DC_OUT_HDMI || dc->out->type == TEGRA_DC_OUT_DP))
 			return tegra_edid_get_source_physical_address(dc->edid,
 				phy_address);
 	}
