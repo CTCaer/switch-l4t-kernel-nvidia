@@ -51,6 +51,7 @@
 #include "edid.h"
 #include "hdcp/dphdcp.h"
 #include "dp_lt.h"
+#include "dp_branch.h"
 #include "dp_auto.h"
 
 #include "hda_dc.h"
@@ -1662,6 +1663,14 @@ static void tegra_dp_irq_evt_worker(struct work_struct *work)
 		}
 	}
 
+	if (dpcd_200h_205h[1] &
+		NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_SINK) {
+		tegra_dp_branch_notify_event(dp);
+		/* Clear IRQ flag */
+		tegra_dc_dp_dpcd_write(dp, NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR,
+				       NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_SINK);
+	}
+
 	if (!link_stable) {
 		int ret = 0;
 
@@ -1685,9 +1694,6 @@ static void tegra_dp_irq_evt_worker(struct work_struct *work)
 		if (!ret)
 			dev_err(&dc->ndev->dev,
 				"dp: link training after IRQ failed\n");
-	} else {
-		dev_info(&dc->ndev->dev,
-			"dp: link stable, ignore irq event\n");
 	}
 done:
 	tegra_dpaux_put(dpaux);
@@ -2236,6 +2242,8 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 		else
 			tegra_dc_set_fb_mode(dc, &tegra_dc_vga_mode, false);
 	}
+
+	tegra_dp_branch_init(&dp->branch_data, dp);
 
 	tegra_dc_dp_debugfs_create(dp);
 	dp_instance++;
@@ -3014,6 +3022,8 @@ static void tegra_dc_dp_destroy(struct tegra_dc *dc)
 	dp->prod_list = NULL;
 
 	tegra_dp_unregister_typec_ecable(dc);
+
+	tegra_dp_branch_unregister(dp);
 
 	tegra_dc_out_destroy(dc);
 
