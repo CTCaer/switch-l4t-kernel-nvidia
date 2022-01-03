@@ -36,6 +36,7 @@ obj-$(CONFIG_DEBUG_FS) += dp_debug.o
 obj-$(CONFIG_TEGRA_DP) += dp.o
 obj-$(CONFIG_TEGRA_DP) += dp_lt.o
 obj-$(CONFIG_TEGRA_DP) += dp_auto.o
+obj-$(CONFIG_TEGRA_DP) += dp_branch.o
 obj-$(CONFIG_TEGRA_DP) += hpd.o
 obj-$(CONFIG_TEGRA_DC) += ext/
 obj-$(CONFIG_TEGRA_HDMI2_0) += hdmi2.0.o
