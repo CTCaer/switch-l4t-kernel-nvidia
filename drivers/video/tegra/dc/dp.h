@@ -28,6 +28,7 @@
 #include "hpd.h"
 #include "../../../../arch/arm/mach-tegra/iomap.h"
 #include "dp_lt.h"
+#include "dp_branch.h"
 
 #ifdef CONFIG_DEBUG_FS
 #include "dp_debug.h"
@@ -144,6 +145,8 @@ struct tegra_dc_dp_data {
 	struct tegra_dp_out *pdata;
 
 	struct tegra_prod *prod_list;
+
+	struct tegra_dp_branch_data branch_data;
 
 #ifdef CONFIG_DEBUG_FS
 	struct dentry *debugdir;
@@ -345,6 +348,7 @@ static inline void tegra_dp_set_outdata(struct tegra_dc_dp_data *dp,
 #define NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_AUTO_TEST_YES	(0x00000001 << 1)
 #define NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_CP_NO		(0x00000000 << 2)
 #define NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_CP_YES	(0x00000001 << 2)
+#define NV_DPCD_DEVICE_SERVICE_IRQ_VECTOR_SINK		(0x00000001 << 6)
 #define NV_DPCD_LANE0_1_STATUS				(0x00000202)
 #define NV_DPCD_LANE2_3_STATUS				(0x00000203)
 #define NV_DPCD_STATUS_LANEX_CR_DONE_SHIFT		0
@@ -444,6 +448,21 @@ static inline void tegra_dp_set_outdata(struct tegra_dc_dp_data *dp,
 #define NV_DPCD_HDCP_RXSTATUS                           (0x00069493)
 #define NV_DPCD_HDCP_RSVD                               (0x00069494)
 #define NV_DPCD_HDCP_DBG                                (0x00069518)
+/* MegaChips STDP2550 branch specific registers */
+#define NV_DPCD_BRANCH_STDP_CEC_CTRL			(0x000005C0)
+#define NV_DPCD_BRANCH_STDP_CEC_CTRL_ENABLE		(0x00000001 << 4)
+#define NV_DPCD_BRANCH_STDP_CEC_CTRL_LOGICAL_ADDR_MASK	(0x0000000F << 0)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_INFO			(0x000005C1)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_INFO_HAS_DATA	(0x00000001 << 4)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_INFO_PACKET_ERROR	(0x00000001 << 5)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_INFO_MSG_LENGTH_MASK	(0x0000000F << 0)
+#define NV_DPCD_BRANCH_STDP_CEC_TX_CTRL			(0x000005C2)
+#define NV_DPCD_BRANCH_STDP_CEC_TX_CTRL_TRANSMIT	(0x00000001 << 4)
+#define NV_DPCD_BRANCH_STDP_CEC_TX_CTRL_TRANSMIT_ERROR	(0x00000001 << 5)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_PACKET_BUFFER_BASE	(0x000005D0)
+#define NV_DPCD_BRANCH_STDP_CEC_RX_PACKET_BUFFER_SIZE	(0x00000010)
+#define NV_DPCD_BRANCH_STDP_CEC_TX_PACKET_BUFFER_BASE	(0x000005E0)
+#define NV_DPCD_BRANCH_STDP_CEC_TX_PACKET_BUFFER_SIZE	(0x00000010)
 
 void tegra_dp_set_max_link_bw(struct tegra_dc_sor_data *sor,
 			      struct tegra_dc_dp_link_config *cfg);

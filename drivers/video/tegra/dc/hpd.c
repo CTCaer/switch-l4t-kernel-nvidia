@@ -22,6 +22,8 @@
 #include "dc_priv.h"
 
 #include "dc.h"
+#include "dp.h"
+#include "dp_branch.h"
 #include "hpd.h"
 
 #define MAX_EDID_READ_ATTEMPTS 5
@@ -43,6 +45,8 @@ static void set_hpd_state(struct tegra_hpd_data *data,
 
 static void hpd_disable(struct tegra_hpd_data *data)
 {
+	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(data->dc);
+
 	if (data->dc->connected) {
 		pr_info("hpd: DC from connected to disconnected\n");
 		if (!data->dc->suspended) {
@@ -65,6 +69,7 @@ static void hpd_disable(struct tegra_hpd_data *data)
 		pr_info("hpd: hpd_switch 0\n");
 	}
 #endif
+	tegra_dp_branch_notify_edid_ready(dp, false);
 }
 
 /* returns bytes read, or negative error */
@@ -200,6 +205,7 @@ static void hpd_plug_state(struct tegra_hpd_data *data)
 
 static void edid_check_state(struct tegra_hpd_data *data)
 {
+	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(data->dc);
 	memset(&data->mon_spec, 0, sizeof(data->mon_spec));
 
 	if (tegra_fb_is_console_enabled(data->dc->pdata)) {
@@ -247,6 +253,8 @@ static void edid_check_state(struct tegra_hpd_data *data)
 		data->ops->edid_ready(data->drv_data);
 
 	edid_read_notify(data);
+
+	tegra_dp_branch_notify_edid_ready(dp, true);	
 
 	set_hpd_state(data, STATE_DONE_ENABLED, -1);
 
