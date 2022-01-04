@@ -22,25 +22,26 @@
 
 #include "dc_priv.h"
 
+#define STDP_CEC_NAME "stdp2550_cec"
+
 struct tegra_dp_branch_data {
 	struct tegra_dc_dp_data *dp;
-	struct work_struct branch_work;
 	bool branch_registered;
-	bool branch_enabled;
 
 	struct cec_adapter *adap;
+	struct work_struct cec_rx_work;
+	struct work_struct cec_tx_work;
 	u8 cec_rx_buf[CEC_MAX_MSG_SIZE];
-	int cec_rx_len;
-	int cec_tx_status;
-	bool cec_tx;
+	u8 cec_tx_buf[CEC_MAX_MSG_SIZE];
+	u8 cec_tx_attempts;
+	int cec_tx_len;
 };
 
 int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
 			 struct tegra_dc_dp_data *dp);
 void tegra_dp_branch_unregister(struct tegra_dc_dp_data *dp);
 int tegra_dp_branch_notify_event(struct tegra_dc_dp_data *dp);
-void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp,
-				       bool ready);
+void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp);
 
 
 #endif
