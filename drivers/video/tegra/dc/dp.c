@@ -2008,7 +2008,7 @@ static irqreturn_t tegra_dp_irq(int irq, void *ptr)
 		}
 		tegra_dp_pending_hpd(dp);
 	} else if (status & DPAUX_INTR_AUX_IRQ_EVENT_PENDING) {
-		dev_info(&dp->dc->ndev->dev, "dp: irq event received%s\n",
+		dev_dbg(&dp->dc->ndev->dev, "dp: irq event received%s\n",
 			dp->enabled ? "" : ", ignoring");
 		if (dp->enabled) {
 			cancel_delayed_work(&dp->irq_evt_dwork);
