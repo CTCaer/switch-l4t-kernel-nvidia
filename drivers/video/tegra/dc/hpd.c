@@ -45,8 +45,6 @@ static void set_hpd_state(struct tegra_hpd_data *data,
 
 static void hpd_disable(struct tegra_hpd_data *data)
 {
-	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(data->dc);
-
 	if (data->dc->connected) {
 		pr_info("hpd: DC from connected to disconnected\n");
 		if (!data->dc->suspended) {
@@ -69,7 +67,6 @@ static void hpd_disable(struct tegra_hpd_data *data)
 		pr_info("hpd: hpd_switch 0\n");
 	}
 #endif
-	tegra_dp_branch_notify_edid_ready(dp, false);
 }
 
 /* returns bytes read, or negative error */
@@ -254,7 +251,7 @@ static void edid_check_state(struct tegra_hpd_data *data)
 
 	edid_read_notify(data);
 
-	tegra_dp_branch_notify_edid_ready(dp, true);	
+	tegra_dp_branch_notify_edid_ready(dp);
 
 	set_hpd_state(data, STATE_DONE_ENABLED, -1);
 
@@ -277,6 +274,7 @@ static void wait_for_hpd_reassert_state(struct tegra_hpd_data *data)
 
 static void edid_recheck_state(struct tegra_hpd_data *data)
 {
+	struct tegra_dc_dp_data *dp = tegra_dc_get_outdata(data->dc);
 	int match = 0, tgt_state, timeout;
 
 	tgt_state = STATE_HPD_RESET;
@@ -303,6 +301,7 @@ static void edid_recheck_state(struct tegra_hpd_data *data)
 		 */
 		if (match) {
 			pr_info("hpd: No EDID change, taking no action.\n");
+			tegra_dp_branch_notify_edid_ready(dp);
 			tgt_state = STATE_DONE_ENABLED;
 			timeout = -1;
 		} else {
