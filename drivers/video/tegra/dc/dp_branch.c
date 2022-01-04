@@ -32,14 +32,14 @@ static int dpb_stm_cec_read(struct tegra_dc_dp_data *dp, u8 *msg)
 		return ret;
 	}
 
-	/* Check if an error occured in rx packet info */
+	/* Check if a rx error occured. Normally we should exit here
+	 * and clear both HAS_DATA and PACKET_ERROR flags.
+	 */
 	if (dpcd_data & NV_DPCD_BRANCH_STDP_CEC_RX_INFO_PACKET_ERROR) {
-		dpcd_data &= ~(NV_DPCD_BRANCH_STDP_CEC_RX_INFO_PACKET_ERROR |
-			       NV_DPCD_BRANCH_STDP_CEC_RX_INFO_HAS_DATA);
+		dpcd_data &= ~NV_DPCD_BRANCH_STDP_CEC_RX_INFO_PACKET_ERROR;
 		tegra_dc_dp_dpcd_write(dp, NV_DPCD_BRANCH_STDP_CEC_RX_INFO,
 				       dpcd_data);
-		dev_err(&dp->dc->ndev->dev, "dp: cec: rx packet error!\n");
-		return -EIO;
+		dev_dbg(&dp->dc->ndev->dev, "dp: cec: rx packet error!\n");
 	}
 
 	/* Check if data is available */
@@ -122,7 +122,7 @@ static int dpb_stm_cec_write(struct tegra_dc_dp_data *dp,
 		      NV_DPCD_BRANCH_STDP_CEC_TX_PACKET_BUFFER_SIZE -
 		      msg_len;
 
-	if (msg_len > 0x10)
+	if (msg_len > CEC_MAX_MSG_SIZE)
 		return -EINVAL;
 
 	/* Wait for previous transfer to finish */
@@ -147,14 +147,14 @@ static int dpb_stm_cec_write(struct tegra_dc_dp_data *dp,
 		return ret;
 	}
 
-	/* Check if transfer error */
+	/* Check if a tx error occured */
 	tegra_dc_dp_dpcd_read(dp, NV_DPCD_BRANCH_STDP_CEC_TX_CTRL,
 			      &dpcd_data);
 	if (dpcd_data & NV_DPCD_BRANCH_STDP_CEC_TX_CTRL_TRANSMIT_ERROR) {
 		/* Clear error flag */
 		tegra_dc_dp_dpcd_write(dp, NV_DPCD_BRANCH_STDP_CEC_TX_CTRL,
 			dpcd_data & ~NV_DPCD_BRANCH_STDP_CEC_TX_CTRL_TRANSMIT_ERROR);
-		dev_err(&dp->dc->ndev->dev, "dp: cec: tx failed!\n");
+		dev_dbg(&dp->dc->ndev->dev, "dp: cec: tx failed!\n");
 		return -EIO;
 	}
 
@@ -166,6 +166,10 @@ static int dpb_stm_cec_set_logical_address(struct tegra_dc_dp_data *dp,
 {
 	int ret = 0;
 	u8 dpcd_data = 0;
+
+	/* Exit if disconnected but return success to framework */
+	if (!dp->dc->connected)
+		return 0;
 
 	if (address == CEC_LOG_ADDR_INVALID)
 		address = 0;
@@ -196,6 +200,10 @@ static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 	int ret = 0;
 	u8 dpcd_data = 0;
 	u8 branch_oui[3] = {0};
+
+	/* Exit if disconnected but return success to framework */
+	if (!dp->dc->connected)
+		return 0;
 
 	/* Check if supported device */
 	for (i = 0; i < sizeof(branch_oui); i++) {
@@ -243,8 +251,6 @@ static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 				     dpcd_data);
 	if (ret) {
 		dev_err(&dp->dc->ndev->dev, "dp: cec: failed to configure!\n");
-	} else {
-		dp->branch_data.branch_enabled = enable;
 	}
 
 	return ret;
@@ -263,71 +269,19 @@ static int dpb_stm_cec_adap_log_addr(struct cec_adapter *adap,
 	return dpb_stm_cec_set_logical_address(data->dp, logical_addr);
 }
 
-static void dpb_stm_cec_worker(struct work_struct *work)
-{
-	struct tegra_dp_branch_data *data = container_of(work,
-						struct tegra_dp_branch_data,
-						branch_work);
-	struct cec_msg msg = {};
-
-	if (data->cec_tx) {
-		if (data->cec_tx_status) {
-			cec_transmit_done(data->adap, CEC_TX_STATUS_NACK,
-					  0, 1, 0, 0);
-		}
-		else {
-			cec_transmit_done(data->adap, CEC_TX_STATUS_OK,
-					  0, 0, 0, 0);
-		}
-		data->cec_tx = false;
-	}
-	if (data->cec_rx_len) {
-		msg.len = data->cec_rx_len;
-		memcpy(msg.msg, data->cec_rx_buf, data->cec_rx_len);
-		cec_received_msg(data->adap, &msg);
-
-		data->cec_rx_len = 0;
-	}
-	
-}
-
 static int dpb_stm_cec_adap_transmit(struct cec_adapter *adap, u8 attempts,
 				  u32 signal_free_time, struct cec_msg *msg)
 {
 	struct tegra_dp_branch_data *data = adap->priv;
-	int i;
 
-	/* Try to transmit */
-	for (i = 0; i < attempts; i++) {
-		data->cec_tx_status = dpb_stm_cec_write(data->dp,
-					msg->msg, msg->len);
-		if (!data->cec_tx_status)
-			break;
-	}
-	/* Notify framework of the result */
-	data->cec_tx = true;
-	schedule_work(&data->branch_work);
-
-	return data->cec_tx_status;
-}
-
-int tegra_dp_branch_notify_event(struct tegra_dc_dp_data *dp)
-{
-	struct tegra_dp_branch_data *data = &dp->branch_data;
-	int len;
-
-	if (!data->branch_registered || !data->branch_enabled)
+	if (!data->dp->dc->connected)
 		return -ENODEV;
 
-	/* Read data */
-	memset(data->cec_rx_buf, 0, CEC_MAX_MSG_SIZE);
-	len = dpb_stm_cec_read(dp, data->cec_rx_buf);
-	if (len <= 0)
-		return len;
-	
-	/* Notify framework of the result */
-	data->cec_rx_len = len;
-	schedule_work(&data->branch_work);
+	data->cec_tx_attempts = attempts;
+	data->cec_tx_len = msg->len;
+	memcpy(data->cec_tx_buf, msg->msg, msg->len);
+
+	schedule_work(&data->cec_tx_work);
 
 	return 0;
 }
@@ -338,8 +292,64 @@ static const struct cec_adap_ops dpb_stm_cec_ops = {
 	.adap_transmit = dpb_stm_cec_adap_transmit,
 };
 
-void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp,
-				       bool ready)
+static void dpb_stm_cec_tx_worker(struct work_struct *work)
+{
+	struct tegra_dp_branch_data *data = container_of(work,
+						struct tegra_dp_branch_data,
+						cec_tx_work);
+	int ret = 0;
+	int i;
+
+	/* Try to transmit */
+	for (i = 0; i < data->cec_tx_attempts; i++) {
+		ret = dpb_stm_cec_write(data->dp,
+					data->cec_tx_buf, data->cec_tx_len);
+		if (!ret)
+			break;
+	}
+	/* Notify framework of the result */
+	if (ret) {
+		cec_transmit_done(data->adap, CEC_TX_STATUS_NACK,
+				  0, data->cec_tx_attempts, 0, 0);
+	} else {
+		cec_transmit_done(data->adap, CEC_TX_STATUS_OK,
+				  0, 0, 0, 0);
+	}
+}
+
+static void dpb_stm_cec_rx_worker(struct work_struct *work)
+{
+	struct tegra_dp_branch_data *data = container_of(work,
+						struct tegra_dp_branch_data,
+						cec_rx_work);
+	struct cec_msg msg = {};
+	int len;
+
+	/* Read data */
+	memset(data->cec_rx_buf, 0, CEC_MAX_MSG_SIZE);
+	len = dpb_stm_cec_read(data->dp, data->cec_rx_buf);
+	if (len <= 0)
+		return;
+
+	/* Send message to framework */
+	msg.len = len;
+	memcpy(msg.msg, data->cec_rx_buf, len);
+	cec_received_msg(data->adap, &msg);
+}
+
+int tegra_dp_branch_notify_event(struct tegra_dc_dp_data *dp)
+{
+	struct tegra_dp_branch_data *data = &dp->branch_data;
+
+	if (!data->branch_registered)
+		return -ENODEV;
+
+	schedule_work(&data->cec_rx_work);
+
+	return 0;
+}
+
+void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp)
 {
 	struct tegra_dp_branch_data *data = &dp->branch_data;
 	u8 pa[2] = {0};
@@ -347,12 +357,8 @@ void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp,
 	if (!data->branch_registered)
 		return;
 
-	if (ready) {
-		if (!tegra_dc_get_source_physical_address(pa))
-			cec_s_phys_addr(data->adap, pa[0] << 8 | pa[1], false);
-	} else {
-		cec_s_phys_addr(data->adap, CEC_PHYS_ADDR_INVALID, false);
-	}
+	if (!tegra_dc_get_source_physical_address(pa))
+		cec_s_phys_addr(data->adap, pa[0] << 8 | pa[1], false);
 }
 
 int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
@@ -364,11 +370,9 @@ int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
 
 	branch_data->dp = dp;
 
-#if CONFIG_TEGRA_DP_BRANCH_STDP2550
-	INIT_WORK(&branch_data->branch_work, dpb_stm_cec_worker);
+#ifdef CONFIG_TEGRA_DP_BRANCH_STDP2550
 	branch_data->adap = cec_allocate_adapter(&dpb_stm_cec_ops,
-				branch_data,
-				"stdp2550_cec",
+				branch_data, STDP_CEC_NAME,
 				CEC_CAP_LOG_ADDRS | CEC_CAP_TRANSMIT |
 				CEC_CAP_PASSTHROUGH | CEC_CAP_RC,
 				1, &dp->dc->ndev->dev);
@@ -383,6 +387,9 @@ int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
 		cec_delete_adapter(branch_data->adap);
 		return ret;
 	}
+
+	INIT_WORK(&branch_data->cec_rx_work, dpb_stm_cec_rx_worker);
+	INIT_WORK(&branch_data->cec_tx_work, dpb_stm_cec_tx_worker);
 
 	dev_info(&dp->dc->ndev->dev, "Branch device registered\n");
 	branch_data->branch_registered = true;
