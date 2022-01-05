@@ -255,7 +255,7 @@ config TEGRA_DP
 
 config TEGRA_DP_BRANCH_STDP2550
 	bool "Enable DP branch STDP2550 support."
-	depends on TEGRA_DP
+	depends on TEGRA_DP && MEDIA_CEC
 	default n
 	help
 	  Say Y here to enable the DP branch MegaChips STDP2550 support.
