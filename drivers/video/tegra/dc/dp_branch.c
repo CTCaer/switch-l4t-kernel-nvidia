@@ -17,6 +17,7 @@
 
 #include <dp.h>
 
+#ifdef CONFIG_TEGRA_DP_BRANCH_STDP2550
 static int dpb_stm_cec_read(struct tegra_dc_dp_data *dp, u8 *msg)
 {
 	u32 i;
@@ -259,14 +260,30 @@ static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 static int dpb_stm_cec_adap_enable(struct cec_adapter *adap, bool enable)
 {
 	struct tegra_dp_branch_data *data = adap->priv;
-	return dpb_stm_cec_enable(data->dp, enable);
+	int ret;
+
+	ret = dpb_stm_cec_enable(data->dp, enable);
+
+	/* Check if HPD is disconnected and return success to framework */
+	if (ret && !READ_ONCE(data->dp->hpd_plug.done))
+		ret = 0;
+
+	return ret;
 }
 
 static int dpb_stm_cec_adap_log_addr(struct cec_adapter *adap,
 				      u8 logical_addr)
 {
 	struct tegra_dp_branch_data *data = adap->priv;
-	return dpb_stm_cec_set_logical_address(data->dp, logical_addr);
+	int ret;
+
+	ret = dpb_stm_cec_set_logical_address(data->dp, logical_addr);
+
+	/* Check if HPD is disconnected and return success to framework */
+	if (ret && !READ_ONCE(data->dp->hpd_plug.done))
+		ret = 0;
+
+	return ret;
 }
 
 static int dpb_stm_cec_adap_transmit(struct cec_adapter *adap, u8 attempts,
@@ -336,29 +353,35 @@ static void dpb_stm_cec_rx_worker(struct work_struct *work)
 	memcpy(msg.msg, data->cec_rx_buf, len);
 	cec_received_msg(data->adap, &msg);
 }
+#endif
 
 int tegra_dp_branch_notify_event(struct tegra_dc_dp_data *dp)
 {
+#ifdef CONFIG_TEGRA_DP_BRANCH_STDP2550
 	struct tegra_dp_branch_data *data = &dp->branch_data;
 
 	if (!data->branch_registered)
 		return -ENODEV;
 
 	schedule_work(&data->cec_rx_work);
+#endif
 
 	return 0;
 }
 
 void tegra_dp_branch_notify_edid_ready(struct tegra_dc_dp_data *dp)
 {
+#ifdef CONFIG_TEGRA_DP_BRANCH_STDP2550
 	struct tegra_dp_branch_data *data = &dp->branch_data;
 	u8 pa[2] = {0};
 
 	if (!data->branch_registered)
 		return;
 
+	cec_s_phys_addr(data->adap, CEC_PHYS_ADDR_INVALID, false);
 	if (!tegra_dc_get_source_physical_address(pa))
 		cec_s_phys_addr(data->adap, pa[0] << 8 | pa[1], false);
+#endif
 }
 
 int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
@@ -395,7 +418,7 @@ int tegra_dp_branch_init(struct tegra_dp_branch_data *branch_data,
 	branch_data->branch_registered = true;
 #endif
 
-	return 0;
+	return ret;
 }
 
 void tegra_dp_branch_unregister(struct tegra_dc_dp_data *dp)
