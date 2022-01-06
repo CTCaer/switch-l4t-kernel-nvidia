@@ -3,7 +3,7 @@
  *
  * User-space interface to nvmap
  *
- * Copyright (c) 2011-2019, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (c) 2011-2021, NVIDIA CORPORATION. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -22,6 +22,7 @@
 #include <linux/fs.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
+#include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/nvmap.h>
@@ -32,14 +33,14 @@
 #include <asm/io.h>
 #include <asm/memory.h>
 #include <asm/uaccess.h>
-
+#include <soc/tegra/common.h>
 #include <trace/events/nvmap.h>
 
 #include "nvmap_ioctl.h"
 #include "nvmap_priv.h"
 #include "nvmap_heap.h"
 
-#include <linux/list.h>
+
 extern struct device tegra_vpr_dev;
 
 static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
@@ -290,6 +291,32 @@ int nvmap_ioctl_create_from_va(struct file *filp, void __user *arg)
 			arg, &op, sizeof(op), 1,  ref->handle->dmabuf);
 }
 
+static int set_vpr_fail_data(void *user_addr, ulong user_stride,
+		       ulong elem_size, ulong count)
+{
+	int ret = 0;
+	void *vaddr;
+
+	vaddr = vmalloc(PAGE_SIZE);
+	if (!vaddr)
+		return -ENOMEM;
+	memset(vaddr, 0xFF, PAGE_SIZE);
+
+	while (!ret && count--) {
+		ulong size_to_copy = elem_size;
+
+		while (!ret && size_to_copy) {
+			ret = copy_to_user(user_addr, vaddr,
+				size_to_copy > PAGE_SIZE ? PAGE_SIZE : size_to_copy);
+			size_to_copy -= (size_to_copy > PAGE_SIZE ? PAGE_SIZE : size_to_copy);
+		}
+		user_addr += user_stride;
+	}
+
+	vfree(vaddr);
+	return ret;
+}
+
 int nvmap_ioctl_rw_handle(struct file *filp, int is_read, void __user *arg,
 			  size_t op_size)
 {
@@ -308,6 +335,7 @@ int nvmap_ioctl_rw_handle(struct file *filp, int is_read, void __user *arg,
 	unsigned long addr, offset, elem_size, hmem_stride, user_stride;
 	unsigned long count;
 	int handle;
+	int ret;
 
 #ifdef CONFIG_COMPAT
 	if (op_size == sizeof(op32)) {
@@ -352,6 +380,24 @@ int nvmap_ioctl_rw_handle(struct file *filp, int is_read, void __user *arg,
 	h = nvmap_handle_get_from_fd(handle);
 	if (!h)
 		return -EINVAL;
+
+	if (is_read && soc_is_tegra186_n_later() &&
+		h->heap_type == NVMAP_HEAP_CARVEOUT_VPR) {
+		/* VPR memory is not readable from CPU.
+		 * Memset buffer to all 0xFF's for backward compatibility. */
+		ret = set_vpr_fail_data((void *)addr, user_stride, elem_size, count);
+		nvmap_handle_put(h);
+		return ret ?: -EPERM;
+	}
+
+	/*
+	 * If Buffer is RO and write operation is asked from the buffer,
+	 * return error.
+	 */
+	if (h->is_ro && !is_read) {
+		nvmap_handle_put(h);
+		return -EPERM;
+	}
 
 	nvmap_kmaps_inc(h);
 	trace_nvmap_ioctl_rw_handle(client, h, is_read, offset,
@@ -437,9 +483,6 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 			 unsigned long count)
 {
 	ssize_t copied = 0;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-	void *tmp = NULL;
-#endif
 	void *addr;
 	int ret = 0;
 
@@ -475,15 +518,6 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 
 	addr = h->vaddr + h_offs;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-	/* Allocate buffer to cache data for VPR write */
-	if (!is_read && h->heap_type == NVMAP_HEAP_CARVEOUT_VPR) {
-		tmp = vmalloc(elem_size);
-		if (!tmp)
-			return -ENOMEM;
-	}
-#endif
-
 	while (count--) {
 		if (h_offs + elem_size > h->size) {
 			pr_warn("read/write outside of handle\n");
@@ -500,10 +534,10 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 		else {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
 			if (h->heap_type == NVMAP_HEAP_CARVEOUT_VPR) {
-				ret = copy_from_user(tmp, (void *)sys_addr,
-						     elem_size);
-				if (!ret)
-					memcpy_toio(addr, tmp, elem_size);
+				uaccess_enable();
+				memcpy_toio(addr, (void *)sys_addr, elem_size);
+				uaccess_disable();
+				ret = 0;
 			} else
 #endif
 				ret = copy_from_user(addr, (void *)sys_addr, elem_size);
@@ -523,12 +557,6 @@ static ssize_t rw_handle(struct nvmap_client *client, struct nvmap_handle *h,
 		h_offs += h_stride;
 		addr += h_stride;
 	}
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 9, 0)
-	/* Release the buffer used for VPR write */
-	if (!is_read && h->heap_type == NVMAP_HEAP_CARVEOUT_VPR && tmp)
-		vfree(tmp);
-#endif
 
 	return ret ?: copied;
 }
@@ -818,7 +846,7 @@ int nvmap_ioctl_gup_test(struct file *filp, void __user *arg)
 
 	err = nvmap_get_user_pages(op.va & PAGE_MASK, nr_page, pages, false, 0);
 	if (err)
-		goto free_pages;
+		goto put_user_pages;
 
 	for (i = 0; i < nr_page; i++) {
 		if (handle->pgalloc.pages[i] != pages[i]) {
@@ -834,10 +862,7 @@ int nvmap_ioctl_gup_test(struct file *filp, void __user *arg)
 	if (copy_to_user(arg, &op, sizeof(op)))
 		err = -EFAULT;
 
-	for (i = 0; i < nr_page; i++) {
-		put_page(handle->pgalloc.pages[i]);
-	}
-free_pages:
+put_user_pages:
 	nvmap_altfree(pages, nr_page * sizeof(*pages));
 put_handle:
 	nvmap_handle_put(handle);
@@ -975,4 +1000,45 @@ int nvmap_ioctl_query_heap_params(struct file *filp, void __user *arg)
 		ret = -EFAULT;
 exit:
 	return ret;
+}
+
+int nvmap_ioctl_query_handle_parameters(struct file *filp, void __user *arg)
+{
+	struct nvmap_handle_parameters op;
+	struct nvmap_handle *handle;
+
+	if (copy_from_user(&op, arg, sizeof(op)))
+		return -EFAULT;
+
+	handle = nvmap_handle_get_from_fd(op.handle);
+	if (handle == NULL)
+		goto exit;
+
+	if (!handle->alloc)
+		op.heap = 0;
+	else
+		op.heap = handle->heap_type;
+
+	/* heap_number, only valid for IVM carveout */
+	op.heap_number = handle->peer;
+
+	op.size = handle->size;
+
+	if (handle->userflags & NVMAP_HANDLE_PHYS_CONTIG)
+		op.contig = 1U;
+	else
+		op.contig = 0U;
+
+	op.align = handle->align;
+
+	op.coherency = handle->flags;
+
+	nvmap_handle_put(handle);
+
+	if (copy_to_user(arg, &op, sizeof(op)))
+		return -EFAULT;
+	return 0;
+
+exit:
+	return -ENODEV;
 }
