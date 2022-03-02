@@ -76,6 +76,7 @@ static inline void set_nvdec(struct platform_device *dev, struct flcn **flcn)
 }
 
 static int nvhost_nvdec_init_sw(struct platform_device *dev);
+static unsigned int tegra_nvdec_enabled_in_bootcmd = -1;
 static unsigned int tegra_nvdec_bootloader_enabled;
 
 static int nvdec_get_bl_fw_name(struct platform_device *pdev, char *name)
@@ -450,12 +451,8 @@ static int nvhost_nvdec_init_sw(struct platform_device *pdev)
 	if (m)
 		return 0;
 
-	/* Below kernel config check is for T210 */
-	if (IS_ENABLED(CONFIG_NVDEC_BOOTLOADER))
-		return nvhost_nvdec_ls_init_sw(pdev, true);
-
-	/* Load NS firmware if fail to load LS firmware */
-	if (nvhost_nvdec_ls_init_sw(pdev, false))
+	/* Load NS firmware if requested by bootarg or failure to load LS firmware */
+	if (tegra_nvdec_enabled_in_bootcmd == 0 || nvhost_nvdec_ls_init_sw(pdev, false))
 		return nvhost_nvdec_ns_init_sw(pdev);
 
 	return 0;
@@ -649,3 +646,13 @@ struct of_device_id nvhost_nvdec_domain_match[] = {
 	{},
 };
 #endif
+
+static int __init tegra_nvdec_bootloader_enabled_arg(char *options)
+{
+	char *p = options;
+
+	tegra_nvdec_enabled_in_bootcmd = memparse(p, &p);
+
+	return 0;
+}
+early_param("nvdec_enabled", tegra_nvdec_bootloader_enabled_arg);
