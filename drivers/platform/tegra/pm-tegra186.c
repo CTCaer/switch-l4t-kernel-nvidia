@@ -79,7 +79,7 @@ int send_smc(u32 smc_func, struct pm_regs *regs)
  * @shutdown_state:	Specific shutdown state to set
  *
  */
-static int tegra_set_shutdown_mode(u32 shutdown_state)
+int tegra_set_shutdown_mode(u32 shutdown_state)
 {
 	struct pm_regs regs;
 	u32 smc_func = SMC_PM_FUNC | (SMC_SET_SHUTDOWN_MODE & SMC_ENUM_MAX);

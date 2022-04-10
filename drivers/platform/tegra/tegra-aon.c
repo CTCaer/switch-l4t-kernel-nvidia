@@ -534,7 +534,7 @@ static ssize_t store_ivc_dbg(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR(ivc_dbg, S_IWUSR, NULL, store_ivc_dbg);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 14, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(4, 9, 142)
 static struct device_node *of_get_compatible_child(
 				const struct device_node *parent,
 				const char *compatible)
