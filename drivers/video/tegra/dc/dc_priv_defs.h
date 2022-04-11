@@ -128,6 +128,8 @@ struct tegra_dc_out_ops {
 	int (*set_hdr)(struct tegra_dc *dc);
 	/* Configure controller for dv infofrmae update */
 	int (*set_dv)(struct tegra_dc *dc, struct tegra_dc_ext_dv *dv);
+	/* Configure controller for avmute update */
+	int (*set_avmute)(struct tegra_dc *dc, struct tegra_dc_ext_avmute *avmute);
 	/* shutdown the serial interface */
 	void (*shutdown_interface)(struct tegra_dc *dc);
 	u32 (*get_crc)(struct tegra_dc *dc);

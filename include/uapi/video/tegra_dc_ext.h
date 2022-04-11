@@ -334,6 +334,7 @@ enum tegra_dc_ext_flip_data_type {
 	TEGRA_DC_EXT_FLIP_USER_DATA_BACKGROUND_COLOR,
 	TEGRA_DC_EXT_FLIP_USER_DATA_AVI_DATA,
 	TEGRA_DC_EXT_FLIP_USER_DATA_DV_DATA,
+	TEGRA_DC_EXT_FLIP_USER_DATA_AVMUTE_DATA, /* tegra_dc_ext_avi */
 };
 
 /*
@@ -425,6 +426,11 @@ enum tegra_dc_ext_dv_signal {
 
 struct tegra_dc_ext_dv {
 	__u8 dv_signal;
+} __attribute__((__packed__));
+
+struct tegra_dc_ext_avmute {
+	__u8 set_or_clear;
+	__u8 reserved[25];
 } __attribute__((__packed__));
 
 /*
@@ -673,6 +679,7 @@ struct tegra_dc_ext_flip_user_data {
 		struct tegra_dc_ext_hdr hdr_info;
 		struct tegra_dc_ext_avi avi_info;
 		struct tegra_dc_ext_dv dv_info;
+		struct tegra_dc_ext_avmute avmute_info;
 		struct tegra_dc_ext_imp_ptr imp_ptr;
 		struct tegra_dc_ext_imp_flip_tag imp_tag;
 		struct tegra_dc_ext_syncpt post_syncpt; /* out */

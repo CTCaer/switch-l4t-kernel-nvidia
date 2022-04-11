@@ -115,6 +115,8 @@ struct tegra_dc_ext_flip_data {
 	struct tegra_dc_hdr hdr_data;
 	struct tegra_dc_ext_avi avi_info;
 	struct tegra_dc_ext_dv dv_data;
+	struct tegra_dc_ext_avmute avmute_data;
+	bool avmute_cache_dirty;
 	bool dv_cache_dirty;
 	bool hdr_cache_dirty;
 	bool avi_cache_dirty;
@@ -1208,6 +1210,10 @@ static void tegra_dc_ext_flip_worker(struct kthread_work *work)
 			if (dc->out_ops && dc->out_ops->set_dv)
 				dc->out_ops->set_dv(dc, &data->dv_data);
 
+		if (data->avmute_cache_dirty)
+			if (dc->out_ops && dc->out_ops->set_avmute)
+				dc->out_ops->set_avmute(dc, &data->avmute_data);
+
 		dc->blanked = false;
 		if (dc->out_ops && dc->out_ops->vrr_enable)
 				dc->out_ops->vrr_enable(dc,
@@ -1791,6 +1797,17 @@ static int tegra_dc_ext_read_user_data(struct tegra_dc_ext_flip_data *data,
 
 			kdata->dv_signal = udata->dv_signal;
 			data->dv_cache_dirty = true;
+			break;
+		}
+		case TEGRA_DC_EXT_FLIP_USER_DATA_AVMUTE_DATA:
+		{
+			struct tegra_dc_ext_avmute *kdata =
+				&data->avmute_data;
+			struct tegra_dc_ext_avmute *udata =
+				&flip_user_data[i].avmute_info;
+
+			kdata->set_or_clear = udata->set_or_clear;
+			data->avmute_cache_dirty = true;
 			break;
 		}
 		case TEGRA_DC_EXT_FLIP_USER_DATA_IMP_TAG:

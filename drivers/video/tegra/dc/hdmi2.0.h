@@ -482,6 +482,8 @@ struct tegra_hdmi {
 	bool enabled;
 	atomic_t clock_refcount;
 
+	bool avmute; /* false: avmute clear, true: avmute set */
+
 	bool dvi;
 
 	u32 clk_type;

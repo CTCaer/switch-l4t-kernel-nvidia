@@ -2226,6 +2226,7 @@ static u32 tegra_hdmi_get_ex_colorimetry(struct tegra_hdmi *hdmi)
 static u32 tegra_hdmi_get_rgb_quant(struct tegra_hdmi *hdmi)
 {
 	u32 vmode = hdmi->dc->mode.vmode;
+	u32 hdmi_quant = HDMI_AVI_RGB_QUANT_DEFAULT;
 
 	/*
 	 * For seamless HDMI, read Q0/Q1 from bootloader
@@ -2250,8 +2251,14 @@ static u32 tegra_hdmi_get_rgb_quant(struct tegra_hdmi *hdmi)
 		}
 	}
 
-	return (vmode & FB_VMODE_LIMITED_RANGE) ? HDMI_AVI_RGB_QUANT_LIMITED :
-		HDMI_AVI_RGB_QUANT_FULL;
+	dev_info(&hdmi->dc->ndev->dev, "hdmi: get RGB quant from EDID.\n");
+	if (tegra_edid_is_rgb_quantization_selectable(hdmi->edid)) {
+		if (vmode & FB_VMODE_LIMITED_RANGE)
+			hdmi_quant = HDMI_AVI_RGB_QUANT_LIMITED;
+		else
+			hdmi_quant = HDMI_AVI_RGB_QUANT_FULL;
+	}
+	return hdmi_quant;
 }
 
 static u32 tegra_hdmi_get_ycc_quant(struct tegra_hdmi *hdmi)
@@ -3002,20 +3009,26 @@ static bool tegra_hdmi_gcp_default_phase_en(struct tegra_hdmi *hdmi)
 }
 
 /* general control packet */
-static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi)
+static void tegra_hdmi_gcp(struct tegra_hdmi *hdmi, bool update_avmute)
 {
 #define GCP_SB1_PP_SHIFT 4
 
 	struct tegra_dc_sor_data *sor = hdmi->sor;
+	u8 sb0 = 0;
 	u8 sb1, sb2;
 
 	/* disable gcp before configuring */
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_CTRL, 0);
 
+	if (update_avmute)
+		sb0 = hdmi->avmute ? NV_SOR_HDMI_GCP_SUBPACK_SB0_SET_AVMUTE :
+				     NV_SOR_HDMI_GCP_SUBPACK_SB0_CLR_AVMUTE;
 	sb1 = tegra_hdmi_gcp_packing_phase(hdmi) << GCP_SB1_PP_SHIFT |
 		tegra_hdmi_gcp_color_depth(hdmi);
 	sb2 = !!tegra_hdmi_gcp_default_phase_en(hdmi);
+
 	tegra_sor_writel(sor, NV_SOR_HDMI_GCP_SUBPACK(0),
+			sb0 << NV_SOR_HDMI_GCP_SUBPACK_SB0_SHIFT |
 			sb1 << NV_SOR_HDMI_GCP_SUBPACK_SB1_SHIFT |
 			sb2 << NV_SOR_HDMI_GCP_SUBPACK_SB2_SHIFT);
 
@@ -3091,9 +3104,14 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 	else
 		tegra_dc_enable_disp_ctrl_mode(dc);
 
-	/* enable hdcp */
-	if (hdmi->nvhdcp && hdmi->edid_src == EDID_SRC_PANEL && !hdmi->dc->vedid)
-		tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	if (dc->initialized) {
+		/* only at boot time, enable hdcp if valid edid */
+		if (hdmi->nvhdcp && !tegra_edid_get_monspecs(hdmi->edid, &hdmi->mon_spec))
+			tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	} else {
+		if (hdmi->nvhdcp && hdmi->edid_src == EDID_SRC_PANEL && !hdmi->dc->vedid)
+			tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
+	}
 
 	if (hdmi->dpaux) {
 		mutex_lock(&hdmi->dpaux->lock);
@@ -3116,7 +3134,7 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 			msecs_to_jiffies(HDMI_SCDC_MONITOR_TIMEOUT_MS));
 	}
 
-	tegra_hdmi_gcp(hdmi);
+	tegra_hdmi_gcp(hdmi, false);
 
 	/* check SOR pad PLL lock status */
 	/*  for newer SOC than T210 */
@@ -3596,6 +3614,21 @@ static int tegra_dc_hdmi_set_dv(struct tegra_dc *dc, struct tegra_dc_ext_dv *dv)
 	tegra_hdmi_dv_infoframe(hdmi);
 
 	return ret;
+}
+
+static int tegra_dc_hdmi_set_avmute(struct tegra_dc *dc,
+				    struct tegra_dc_ext_avmute *avmute)
+{
+	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
+
+	if (hdmi->avmute == avmute->set_or_clear)
+		return 0;
+
+	hdmi->avmute = avmute->set_or_clear;
+
+	tegra_hdmi_gcp(hdmi, true);
+
+	return 0;
 }
 
 static int tegra_dc_hdmi_set_hdr(struct tegra_dc *dc)
@@ -4173,9 +4206,16 @@ struct tegra_dc_out_ops tegra_dc_hdmi2_0_ops = {
 	.hpd_state = tegra_dc_hdmi_hpd_state,
 	.vrr_enable = tegra_dc_hdmi_vrr_enable,
 	.vrr_update_monspecs = tegra_hdmivrr_update_monspecs,
+	/*
+	 * FIXME: Each info frame status register has waiting/done state. Use
+	 *        this state along with current scanline information to
+	 *        prevent info frames updates while previous one is pending.
+	 *        Applies to all info frames, AVI/VSI/GCP.
+	 */
 	.set_hdr = tegra_dc_hdmi_set_hdr,
 	.set_avi = tegra_dc_hdmi_set_avi,
 	.set_dv = tegra_dc_hdmi_set_dv,
+	.set_avmute = tegra_dc_hdmi_set_avmute,
 	.postpoweron = tegra_dc_hdmi_postpoweron,
 	.shutdown_interface = tegra_dc_hdmi_sor_sleep,
 	.get_crc = tegra_dc_hdmi_sor_crc_check,
