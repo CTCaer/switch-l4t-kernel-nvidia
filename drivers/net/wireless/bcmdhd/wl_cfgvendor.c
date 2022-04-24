@@ -2,7 +2,7 @@
  * Linux cfg80211 Vendor Extension Code
  *
  * Copyright (C) 1999-2014, Broadcom Corporation
- * Copyright (C) 2015-2017, NVIDIA CORPORATION. All rights reserved.
+ * Copyright (C) 2015-2021, NVIDIA CORPORATION. All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -233,6 +233,7 @@ static int wl_cfgvendor_start_mkeep_alive(struct wiphy *wiphy, struct wireless_d
 	u8 src_mac[ETHER_ADDR_LEN];
 	u8 dst_mac[ETHER_ADDR_LEN];
 	u32 period_msec = 0;
+	u16 ether_type = 0;
 	const struct nlattr *iter;
 	struct bcm_cfg80211 *cfg = wiphy_priv(wiphy);
 	dhd_pub_t *dhd_pub = cfg->pub;
@@ -273,6 +274,9 @@ static int wl_cfgvendor_start_mkeep_alive(struct wiphy *wiphy, struct wireless_d
 			case MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC:
 				period_msec = nla_get_u32(iter);
 				break;
+			case MKEEP_ALIVE_ATTRIBUTE_ETHER_TYPE:
+				ether_type = nla_get_u16(iter);
+				break;
 			default:
 				WL_ERR(("Unknown type: %d\n", type));
 				ret = BCME_BADARG;
@@ -287,7 +291,7 @@ static int wl_cfgvendor_start_mkeep_alive(struct wiphy *wiphy, struct wireless_d
 	}
 
 	ret = dhd_dev_start_mkeep_alive(dhd_pub, mkeep_alive_id, ip_pkt, ip_pkt_len, src_mac,
-		dst_mac, period_msec);
+		dst_mac, period_msec, ether_type);
 	if (ret < 0) {
 		WL_ERR(("start_mkeep_alive is failed ret: %d\n", ret));
 	}
@@ -543,6 +547,38 @@ static const struct wiphy_vendor_command wl_vendor_cmds [] = {
 		},
 		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
 		.doit = wl_cfgvendor_stop_mkeep_alive
+	},
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd = WIFI_SUBCMD_TX_PWR_SCENARIO
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = wl_cfgvendor_unsupported_feature
+	},
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd =  WIFI_SUBCMD_SET_LATENCY_MODE
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = wl_cfgvendor_unsupported_feature
+	},
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd =  DEBUG_GET_WAKE_REASON_STATS
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = wl_cfgvendor_unsupported_feature
+	},
+	{
+		{
+			.vendor_id = OUI_GOOGLE,
+			.subcmd =  DEBUG_SET_HAL_PID
+		},
+		.flags = WIPHY_VENDOR_CMD_NEED_WDEV | WIPHY_VENDOR_CMD_NEED_NETDEV,
+		.doit = wl_cfgvendor_unsupported_feature
 	},
 #endif /* KEEP_ALIVE */
 };

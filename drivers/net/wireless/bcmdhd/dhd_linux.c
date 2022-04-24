@@ -5,7 +5,7 @@
  * Copyright (C) 1999-2015, Broadcom Corporation
  *
  * Portions contributed by Nvidia
- * Copyright (C) 2015-2019, NVIDIA Corporation. All rights reserved.
+ * Copyright (C) 2015-2021, NVIDIA Corporation. All rights reserved.
  *
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
@@ -3099,6 +3099,12 @@ dhd_rx_frame(dhd_pub_t *dhdp, int ifidx, void *pktbuf, int numpkt, uint8 chan)
 					DHD_ERROR(("ifidx:%d DHCP - REQUEST [RX]\n", ifidx));
 				} else if (dump_hex == 0x0105) {
 					DHD_ERROR(("ifidx:%d DHCP - ACK [RX]\n", ifidx));
+#ifdef CONFIG_BCMDHD_CUSTOM_NET_BW_EST_TEGRA
+					/* activate bw_estimator since DHCP is completed
+					 * the actual bw can never be one. So using value 1 as flag
+					 */
+					bcmdhd_stat.driver_stat.cur_bw_est = 1;
+#endif /* CONFIG_BCMDHD_CUSTOM_NET_BW_EST_TEGRA */
 				} else {
 					DHD_ERROR(("ifidx:%d DHCP - 0x%X [RX]\n", dump_hex, ifidx));
 				}
@@ -9967,7 +9973,7 @@ dhd_wmf_t* dhd_wmf_conf(dhd_pub_t *dhdp, uint32 idx)
 #define TEMP_FRAME_SIZE 300
 int
 dhd_dev_start_mkeep_alive(dhd_pub_t *dhd_pub, u8 mkeep_alive_id, u8 *ip_pkt, u16 ip_pkt_len,
-	u8* src_mac, u8* dst_mac, u32 period_msec)
+	u8* src_mac, u8* dst_mac, u32 period_msec, u16 ether_type)
 {
 	char *pbuf;
 	const char *str;
@@ -10071,9 +10077,15 @@ dhd_dev_start_mkeep_alive(dhd_pub_t *dhd_pub, u8 mkeep_alive_id, u8 *ip_pkt, u16
 	memcpy(pmac_frame, src_mac, ETHER_ADDR_LEN);
 	pmac_frame += ETHER_ADDR_LEN;
 
-	/* Mapping Ethernet type (ETHERTYPE_IP: 0x0800) */
-	*(pmac_frame++) = 0x08;
-	*(pmac_frame++) = 0x00;
+	if (ether_type == 0) {
+		/* Mapping Ethernet type (ETHERTYPE_IP: 0x0800) */
+		*(pmac_frame++) = 0x08;
+		*(pmac_frame++) = 0x00;
+	} else {
+		*(pmac_frame) = ether_type;
+		/* 2 Octets to be moved */
+		pmac_frame += 2;
+	}
 
 	/* Mapping IP pkt */
 	memcpy(pmac_frame, ip_pkt, ip_pkt_len);

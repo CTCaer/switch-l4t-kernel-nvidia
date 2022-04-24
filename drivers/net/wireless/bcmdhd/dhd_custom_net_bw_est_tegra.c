@@ -3,7 +3,7 @@
  *
  * NVIDIA Tegra Network Bandwidth Estimator for BCMDHD driver
  *
- * Copyright (C) 2015 NVIDIA Corporation. All rights reserved.
+ * Copyright (c) 2015-2021 NVIDIA CORPORATION. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -121,6 +121,10 @@ static unsigned char tegra_net_bw_est_dst_macaddr[ETH_ALEN];
 #define TEGRA_NET_BW_EST_PKTGEN_FAKE_UDP_DST_PORT	5001
 #endif
 
+#ifndef TEGRA_NET_BW_EST_PKTGEN_DATA
+#define TEGRA_NET_BW_EST_PKTGEN_DATA	"TEST PACKET"
+#endif
+
 atomic_t ip_ident = ATOMIC_INIT(0);
 
 static void tegra_net_bw_est_pktgen(struct net_device *net,
@@ -175,6 +179,8 @@ static void tegra_net_bw_est_pktgen(struct net_device *net,
 
 	/* put data */
 	data = skb_put(skb, data_len);
+	memset(skb->data, 0, data_len);
+	memcpy(skb->data, TEGRA_NET_BW_EST_PKTGEN_DATA, strlen(TEGRA_NET_BW_EST_PKTGEN_DATA));
 #if 0
 	get_random_bytes(data, data_len);
 #endif
@@ -198,7 +204,7 @@ static void tegra_net_bw_est_pktgen(struct net_device *net,
 	iphdr->tot_len = htons(iphdr_len + udphdr_len + data_len);
 	iphdr->id = htons(atomic_inc_return(&ip_ident));
 	iphdr->frag_off = htons(0);
-	iphdr->ttl = 64;
+	iphdr->ttl = 0;
 	iphdr->protocol = IPPROTO_UDP;
 	iphdr->check = 0;	/* 0 = to force bad IP header checksum */
 	iphdr->saddr = TEGRA_NET_BW_EST_PKTGEN_FAKE_IP_SRC_ADDR;

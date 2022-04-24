@@ -2,7 +2,7 @@
  * Linux cfg80211 Vendor Extension Code
  *
  * Copyright (C) 1999-2014, Broadcom Corporation
- *
+ * Copyright (C) 2021, NVIDIA CORPORATION. All rights reserved.
  *      Unless you and Broadcom execute a separate written software license
  * agreement governing use of this software, this software is licensed to you
  * under the terms of the GNU General Public License version 2 (the "GPL"),
@@ -88,6 +88,10 @@ typedef enum {
 	ANDROID_NL80211_SUBCMD_WIFI_OFFLOAD_RANGE_START = 0x1600,
 	ANDROID_NL80211_SUBCMD_WIFI_OFFLOAD_RANGE_END   = 0x16FF,
 
+	/* define all tx power related commands between 0x1900 and 0x1910 */
+	ANDROID_NL80211_SUBCMD_TX_POWER_RANGE_START	= 0x1900,
+	ANDROID_NL80211_SUBCMD_TX_POWER_RANGE_END	= 0x1910,
+
 	/* This is reserved for future usage */
 
 } ANDROID_VENDOR_SUB_COMMAND;
@@ -118,6 +122,7 @@ enum wl_vendor_subcmd {
 	WIFI_SUBCMD_SET_BSSID_BLACKLIST,
 	GSCAN_SUBCMD_ANQPO_CONFIG,
 	WIFI_SUBCMD_SET_RSSI_MONITOR,
+	WIFI_SUBCMD_SET_LATENCY_MODE = 0x101b,
 	RTT_SUBCMD_SET_CONFIG = ANDROID_NL80211_SUBCMD_RTT_RANGE_START,
 	RTT_SUBCMD_CANCEL_CONFIG,
 	RTT_SUBCMD_GETCAPABILITY,
@@ -130,8 +135,11 @@ enum wl_vendor_subcmd {
 	DEBUG_GET_RING_DATA,
 	DEBUG_GET_FEATURE,
 	DEBUG_RESET_LOGGING,
+	DEBUG_GET_WAKE_REASON_STATS = 0x140d,
+	DEBUG_SET_HAL_PID = 0x1412,
 	WIFI_OFFLOAD_SUBCMD_START_MKEEP_ALIVE = ANDROID_NL80211_SUBCMD_WIFI_OFFLOAD_RANGE_START,
 	WIFI_OFFLOAD_SUBCMD_STOP_MKEEP_ALIVE,
+	WIFI_SUBCMD_TX_PWR_SCENARIO =  ANDROID_NL80211_SUBCMD_TX_POWER_RANGE_START,
 	/* Add more sub commands here */
     VENDOR_SUBCMD_MAX
 };
@@ -305,7 +313,8 @@ enum mkeep_alive_attributes {
 	MKEEP_ALIVE_ATTRIBUTE_IP_PKT_LEN,
 	MKEEP_ALIVE_ATTRIBUTE_SRC_MAC_ADDR,
 	MKEEP_ALIVE_ATTRIBUTE_DST_MAC_ADDR,
-	MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC
+	MKEEP_ALIVE_ATTRIBUTE_PERIOD_MSEC,
+	MKEEP_ALIVE_ATTRIBUTE_ETHER_TYPE
 };
 
 enum wifi_rssi_monitor_attr {
