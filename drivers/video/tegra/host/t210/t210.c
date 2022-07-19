@@ -47,6 +47,7 @@
 #include "vhost/vhost.h"
 
 #include "cg_regs.c"
+#include "actmon_regs.c"
 
 #define HOST_EMC_FLOOR 204000000
 #define HOST_NVDEC_EMC_FLOOR 102000000
@@ -378,6 +379,8 @@ struct nvhost_device_data t21_vic_info = {
 	.linear_emc		= true,
 	.actmon_enabled         = true,
 	.actmon_irq		= 13,
+	.actmon_weight_count	= 136, /* T210: 130, T210B01: 136. */
+	.actmon_setting_regs	= t210_vic_actmon_registers,
 	.devfreq_governor	= "wmark_active",
 	.serialize		= true,
 	.push_work_done		= true,
