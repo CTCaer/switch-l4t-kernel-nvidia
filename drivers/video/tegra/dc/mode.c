@@ -522,6 +522,8 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 	unsigned long v_sync_width;
 	unsigned long v_active;
 
+	bool skip_pclk_check = false;
+
 	tegra_dc_get(dc);
 
 	if (dc->out_ops && dc->out_ops->modeset_notifier)
@@ -636,13 +638,31 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 		return -ERANGE;
 	}
 	div = (rate * 2 / pclk) - 2;
+
+	/* for non nvdisplay dsi output use internal calculated divider */
+	if (dc->out->type == TEGRA_DC_OUT_DSI && !tegra_dc_is_nvdisplay()) {
+		struct tegra_dc_dsi_data *dsi = tegra_dc_get_outdata(dc);
+		/* formula: (dsi->shift_clk_div - 1) * 2 */
+		div = DIV_ROUND_CLOSEST(((dsi->shift_clk_div.mul -
+					dsi->shift_clk_div.div) * 2),
+					dsi->shift_clk_div.div);
+
+		/* skip pclk change if divider real div does not match */
+		if (div != ((rate * 2 / pclk) - 2)) {
+			dev_info(&dc->ndev->dev, "dsi clock div corrected\n");
+			skip_pclk_check = true;
+		}
+
+		pclk = rate / ((div + 2) / 2 * 10 + ((div + 2) % 2) * 5) * 10;
+	}
+
 	dev_info(&dc->ndev->dev,
 		"nominal-pclk:%d parent:%lu div:%lu.%lu pclk:%lu %d~%d\n",
 		mode->pclk, rate, (div + 2) / 2, ((div + 2) % 2) * 5, pclk,
 		mode->pclk / 100 * 99, mode->pclk / 100 * 109);
 
 	/* skip pclk range check for TEGRA_DC_OUT_NULL */
-	if (dc->out->type != TEGRA_DC_OUT_NULL) {
+	if (dc->out->type != TEGRA_DC_OUT_NULL && !skip_pclk_check) {
 		if (!pclk || pclk < (mode->pclk / 100 * 99) ||
 			pclk > (mode->pclk / 100 * 109)) {
 			dev_err(&dc->ndev->dev, "pclk out of range!\n");
@@ -650,9 +670,8 @@ int tegra_dc_program_mode(struct tegra_dc *dc, struct tegra_dc_mode *mode)
 		}
 	}
 
-	if (dc->out->type != TEGRA_DC_OUT_DSI) /* TODO: MIPI clock cals */
-		tegra_dc_writel(dc, PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(div),
-				DC_DISP_DISP_CLOCK_CONTROL);
+	tegra_dc_writel(dc, PIXEL_CLK_DIVIDER_PCD1 | SHIFT_CLK_DIVIDER(div),
+			DC_DISP_DISP_CLOCK_CONTROL);
 
 #ifdef CONFIG_SWITCH
 	if (dc->switchdev_registered)
