@@ -4062,6 +4062,45 @@ fail:
 }
 EXPORT_SYMBOL(tegra_dsi_panel_sanity_check);
 
+static void tegra_dsi_bl_on(struct tegra_dc_dsi_data *dsi)
+{
+	struct backlight_device *bd =
+				get_backlight_device_by_name(dsi->info.bl_name);
+
+	if (!bd)
+		return;
+
+	/* Restore previous setting if possible */
+	backlight_update_status(bd);
+}
+
+static void tegra_dsi_bl_off(struct tegra_dc_dsi_data *dsi)
+{
+	struct backlight_device *bd =
+				get_backlight_device_by_name(dsi->info.bl_name);
+	struct platform_driver *pdrv = NULL;
+	struct platform_device *pdev = NULL;
+
+	if (!bd)
+		return;
+
+	if (bd->dev.parent) {
+		pdrv = to_platform_driver(bd->dev.parent->driver);
+		pdev = to_platform_device(bd->dev.parent);
+	}
+	
+	/*
+	 * To avoid confusing userspace, utilize backlight disable,
+	 * for avoiding the change to current brightness if possible.
+	 */
+	if (pdrv && pdev && pdrv->shutdown) {
+		pdrv->shutdown(pdev);
+	} else {
+		bd->props.brightness = 0;
+		backlight_update_status(bd);
+	}
+}
+
 static int tegra_dsi_enter_ulpm(struct tegra_dc_dsi_data *dsi)
 {
 	u32 val;
@@ -4325,6 +4364,9 @@ static void tegra_dc_dsi_enable(struct tegra_dc *dc)
 
 	if (dsi->out_ops && dsi->out_ops->enable)
 		dsi->out_ops->enable(dsi);
+
+	tegra_dsi_bl_on(dsi);
+
 fail:
 	tegra_dc_io_end(dc);
 	mutex_unlock(&dsi->lock);
@@ -5090,15 +5132,6 @@ static bool tegra_dc_dsi_osidle(struct tegra_dc *dc)
 		return false;
 }
 
-static void tegra_dsi_bl_off(struct backlight_device *bd)
-{
-	if (!bd)
-		return;
-
-	bd->props.brightness = 0;
-	backlight_update_status(bd);
-}
-
 static int tegra_dsi_deep_sleep(struct tegra_dc *dc,
 				struct tegra_dc_dsi_data *dsi)
 {
@@ -5110,7 +5143,7 @@ static int tegra_dsi_deep_sleep(struct tegra_dc *dc,
 
 	cancel_delayed_work(&dsi->idle_work);
 
-	tegra_dsi_bl_off(get_backlight_device_by_name(dsi->info.bl_name));
+	tegra_dsi_bl_off(dsi);
 
 	/* Suspend DSI panel */
 	err = tegra_dsi_send_panel_cmd(dc, dsi,
@@ -5316,10 +5349,10 @@ static void tegra_dc_dsi_resume(struct tegra_dc *dc)
 	 * will reconfigure the controller from scratch
 	 */
 
-	 if (dsi->out_ops && dsi->out_ops->resume)
+	if (dsi->out_ops && dsi->out_ops->resume)
 		dsi->out_ops->resume(dsi);
 
-	 tegra_dsi_pending_hpd(dsi);
+	tegra_dsi_pending_hpd(dsi);
 }
 #endif
 
