@@ -3219,7 +3219,11 @@ struct snd_soc_dai_link *tegra_machine_new_codec_links(
 					"Property 'srate' missing or invalid\n");
 				goto err;
 			}
-			params->rate_max = params->rate_min;
+
+			if (of_property_read_u32(subnp,
+				"srate_max", &params->rate_max)) {
+				params->rate_max = params->rate_min;
+			}
 
 			if (of_property_read_u32(subnp,
 				"num-channel", &params->channels_min)) {
@@ -4057,7 +4061,10 @@ int tegra_asoc_populate_dai_links(struct platform_device *pdev)
 			dev_err(&pdev->dev, "Property 'srate' missing\n");
 			break;
 		}
-		params->rate_max = params->rate_min;
+
+		ret = of_property_read_u32(subnp, "srate_max", &params->rate_max);
+		if (ret < 0)
+			params->rate_max = params->rate_min;
 
 		ret = of_property_read_u32(subnp, "num-channel",
 					   &params->channels_min);
