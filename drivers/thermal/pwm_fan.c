@@ -1390,7 +1390,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	/* print out initialized info */
 	for (i = 0; i < fan_data->active_steps; i++) {
-		dev_info(&pdev->dev,
+		dev_dbg(&pdev->dev,
 			"index %d: pwm=%d, rpm=%d, rru=%d, rrd=%d, state:%d\n",
 			i,
 			fan_data->fan_pwm[i],
