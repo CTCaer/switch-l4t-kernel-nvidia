@@ -60,6 +60,15 @@ config FAN_THERM_EST
 	This enables a virtual sensor that polls other registered thermal
 	zone devices for temperature updates.
 
+config TSKIN_FAN_THERM_EST
+	tristate "Fan driving tskin temp estimator"
+	---help---
+	Thermal driver that estimates the fan driving temperature by producing
+	tskin based onother sensors.
+
+	This enables a virtual sensor that polls other registered thermal
+	zone devices for temperature updates.
+
 config EQOS_APE_HWDEP
 	tristate "EQOS APE HWDEP Driver"
 	default n
