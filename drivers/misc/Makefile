@@ -11,6 +11,7 @@ obj-$(CONFIG_SENSORS_NCT1008)	+= nct1008.o
 obj-$(CONFIG_TEGRA_CPC)		+= tegra_cpc.o
 obj-$(CONFIG_THERM_EST)		+= therm_est.o
 obj-$(CONFIG_FAN_THERM_EST)	+= therm_fan_est.o
+obj-$(CONFIG_TSKIN_FAN_THERM_EST) += therm_tskin_fan_est.o
 obj-$(CONFIG_EQOS_APE_HWDEP) += eqos_ape/
 obj-$(CONFIG_TEGRA_SKIN)	+= tegra-skin.o
 obj-$(CONFIG_TEGRA186_AHC) += tegra186-ahc/
