@@ -42,6 +42,7 @@ enum {
 	TEGRA_GPIO_BRIDGE_EN_0,
 	TEGRA_GPIO_BRIDGE_EN_1,
 	TEGRA_GPIO_BRIDGE_REFCLK_EN,
+	TEGRA_GPIO_PANEL_IRQ,
 	TEGRA_N_GPIO_PANEL, /* add new gpio above this entry */
 };
 
@@ -54,7 +55,7 @@ struct tegra_panel_of {
 static struct tegra_panel_of __maybe_unused panel_of = {
 	/* TEGRA_N_GPIO_PANEL counts of gpio should be
 	 * initialized to TEGRA_GPIO_INVALID */
-	.panel_gpio = {-1, -1, -1, -1, -1, -1, -1},
+	.panel_gpio = {-1, -1, -1, -1, -1, -1, -1, -1, -1},
 };
 
 /* To handle multipe panels */

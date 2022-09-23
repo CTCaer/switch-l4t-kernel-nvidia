@@ -131,6 +131,10 @@ int tegra_panel_gpio_get_dt(const char *comp_str,
 		of_get_named_gpio(node,
 			"nvidia,panel-bridge-refclk-en-gpio", 0);
 
+	panel->panel_gpio[TEGRA_GPIO_PANEL_IRQ] =
+		of_get_named_gpio(node,
+			"nvidia,panel-irq-gpio", 0);
+
 	for (cnt = 0; cnt < TEGRA_N_GPIO_PANEL; cnt++) {
 		if (gpio_is_valid(panel->panel_gpio[cnt])) {
 			switch (cnt) {
@@ -157,6 +161,9 @@ int tegra_panel_gpio_get_dt(const char *comp_str,
 				break;
 			case TEGRA_GPIO_BRIDGE_REFCLK_EN:
 				label = "tegra-panel-bridge-refclk-en";
+				break;
+			case TEGRA_GPIO_PANEL_IRQ:
+				label = "tegra-panel-irq";
 				break;
 			default:
 				pr_err("tegra panel no gpio entry\n");
