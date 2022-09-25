@@ -4384,8 +4384,10 @@ static void tegra_dc_dsi_postpoweron(struct tegra_dc *dc)
 		if (dsi->info.lp00_pre_panel_wakeup)
 			tegra_dsi_pad_enable(dsi);
 
-		err = tegra_dsi_send_panel_cmd(dc, dsi, dsi->info.dsi_init_cmd,
-							dsi->info.n_init_cmd);
+		if (!dc->initialized)
+			err = tegra_dsi_send_panel_cmd(dc, dsi,
+						       dsi->info.dsi_init_cmd,
+						       dsi->info.n_init_cmd);
 		if (err < 0) {
 			dev_err(&dc->ndev->dev,
 				"dsi: error while sending dsi init cmd\n");
