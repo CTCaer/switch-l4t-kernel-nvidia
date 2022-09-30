@@ -255,7 +255,7 @@ struct tegra_dsi_padctrl *tegra_dsi_padctrl_init(struct tegra_dc *dc)
 		goto free_mem;
 	}
 
-	if (tegra_bpmp_running()) {
+	if ((tegra_dc_is_t21x() && tegra_platform_is_silicon()) || tegra_bpmp_running()) {
 		dsi_padctrl->reset = of_reset_control_get(np_dsi, "dsi_padctrl");
 		if (IS_ERR_OR_NULL(dsi_padctrl->reset)) {
 			dev_err(&dc->ndev->dev, "dsi padctl: Failed to get reset\n");

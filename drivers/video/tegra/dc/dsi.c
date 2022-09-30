@@ -2232,7 +2232,7 @@ static void tegra_dsi_set_dsi_clk(struct tegra_dc *dc,
 			DIV_ROUND_UP(S_TO_MS(1), dsi->info.refresh_rate);
 
 	tegra_dsi_setup_clk(dc, dsi);
-	if (tegra_bpmp_running())
+	if ((tegra_dc_is_t21x() && tegra_platform_is_silicon()) || tegra_bpmp_running())
 		tegra_dsi_reset_deassert(dsi);
 
 	dsi->current_dsi_clk_khz =
@@ -4697,7 +4697,7 @@ static int _tegra_dc_dsi_init(struct tegra_dc *dc)
 			goto err_dsi_clk_put;
 		}
 
-		if (tegra_platform_is_silicon() && tegra_bpmp_running()) {
+		if ((tegra_dc_is_t21x() && tegra_platform_is_silicon()) || tegra_bpmp_running()) {
 			dsi_reset = of_reset_control_get(np_dsi,
 					dsi_reset_name[index]);
 			if (IS_ERR_OR_NULL(dsi_reset)) {
@@ -5574,7 +5574,8 @@ static void tegra_dc_dsi_setup_clk_nvdisplay(struct tegra_dc *dc,
 		}
 	}
 
-	if (tegra_bpmp_running() && base_clk &&
+	if (((tegra_dc_is_t21x() && tegra_platform_is_silicon()) ||
+		  tegra_bpmp_running()) && base_clk &&
 			rate != clk_get_rate(base_clk)) {
 		tegra_nvdisp_test_and_set_compclk(rate, dc);
 		err = clk_set_rate(base_clk, rate);
