@@ -67,14 +67,14 @@ int tegra_hda_get_dev_id(struct tegra_dc_sor_data *sor)
 
 	tegra_sor_unpowergate(sor);
 	tegra_sor_safe_clk_enable(sor);
-	if (!sor->dc->initialized)
+	if (!sor->dc->bl_initialized)
 		tegra_sor_clk_enable(sor);
 	tegra_dc_io_start(sor->dc);
 	dev_id = tegra_sor_readl_ext(sor, NV_SOR_AUDIO_GEN_CTRL);
 	dev_id = (dev_id >> NV_SOR_AUDIO_GEN_CTRL_DEV_ID_SHIFT) &
 			NV_SOR_AUDIO_GEN_CTRL_DEV_ID_MASK;
 	tegra_dc_io_end(sor->dc);
-	if (!sor->dc->initialized)
+	if (!sor->dc->bl_initialized)
 		tegra_sor_clk_disable(sor);
 	tegra_sor_safe_clk_disable(sor);
 	tegra_sor_powergate(sor);

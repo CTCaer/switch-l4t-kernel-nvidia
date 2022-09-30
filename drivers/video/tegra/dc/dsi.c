@@ -4365,8 +4365,6 @@ static void tegra_dc_dsi_enable(struct tegra_dc *dc)
 	if (dsi->out_ops && dsi->out_ops->enable)
 		dsi->out_ops->enable(dsi);
 
-	tegra_dsi_bl_on(dsi);
-
 fail:
 	tegra_dc_io_end(dc);
 	mutex_unlock(&dsi->lock);
@@ -4384,7 +4382,7 @@ static void tegra_dc_dsi_postpoweron(struct tegra_dc *dc)
 		if (dsi->info.lp00_pre_panel_wakeup)
 			tegra_dsi_pad_enable(dsi);
 
-		if (!dc->initialized)
+		if (!dc->bl_initialized)
 			err = tegra_dsi_send_panel_cmd(dc, dsi,
 						       dsi->info.dsi_init_cmd,
 						       dsi->info.n_init_cmd);
@@ -5599,7 +5597,7 @@ static void tegra_dc_dsi_setup_clk_nvdisplay(struct tegra_dc *dc,
 		clk_set_parent(clk, parent_clk);
 
 
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		clk_set_rate(dc->clk, dc->mode.pclk);
 		tegra_nvdisp_test_and_set_compclk(dc->mode.pclk, dc);
 	}
@@ -5613,7 +5611,7 @@ static long tegra_dc_dsi_setup_clk(struct tegra_dc *dc, struct clk *clk)
 	if (dc->out->dsc_en && dsi->dsc_clk)
 		tegra_dsi_set_dsc_clk(dc, dsi);
 
-	if (dc->initialized)
+	if (dc->bl_initialized)
 		goto skip_setup;
 
 	if (tegra_dc_is_nvdisplay())

@@ -448,7 +448,7 @@ static int dsi_l_720p_5_loki_enable(struct device *dev)
 			dsi_l_720p_5_loki_pdata.dsi_panel_rst_gpio;
 
 	/* Skip panel programming if in initialized mode */
-	if (!tegra_dc_initialized(dev)) {
+	if (!tegra_dc_bl_initialized(dev)) {
 		dsi_l_720p_5_loki_pdata.dsi_init_cmd = dsi_init_cmd;
 		gpio_set_value(en_panel_rst, 0);
 	} else {

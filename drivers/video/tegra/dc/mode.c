@@ -952,7 +952,7 @@ int tegra_dc_set_fbcon_boot_mode(struct tegra_dc *dc, struct tegra_edid *edid)
 		}
 
 		/* In case of seamless display, dc mode would already be set */
-		if (!dc->initialized) {
+		if (!dc->bl_initialized) {
 			if (dc->out->fbcon_default_mode) {
 				ret = tegra_dc_set_fb_mode(dc,
 					dc->out->fbcon_default_mode, false);

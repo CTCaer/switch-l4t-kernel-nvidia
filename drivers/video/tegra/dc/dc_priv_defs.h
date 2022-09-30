@@ -500,7 +500,7 @@ struct tegra_dc {
 	 * used to suppress such code blocks during system boot,
 	 * a.k.a the call stack above tegra_dc_probe().
 	 */
-	bool				initialized;
+	bool				bl_initialized;
 #ifdef CONFIG_TEGRA_HDMI2FPD
 	struct tegra_dc_hdmi2fpd_data   *fpddata;
 #endif

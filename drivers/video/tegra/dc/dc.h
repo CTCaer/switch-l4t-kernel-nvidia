@@ -1067,7 +1067,7 @@ void tegra_dc_shutdown(struct platform_device *ndev);
 void tegra_get_fb_resource(struct resource *fb_res, int instance);
 
 unsigned tegra_dc_out_flags_from_dev(struct device *dev);
-bool tegra_dc_initialized(struct device *dev);
+bool tegra_dc_bl_initialized(struct device *dev);
 bool tegra_dc_is_ext_panel(const struct tegra_dc *dc);
 
 struct spd_infoframe {

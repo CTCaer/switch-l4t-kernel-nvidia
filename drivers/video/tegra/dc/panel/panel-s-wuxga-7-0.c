@@ -156,7 +156,7 @@ static int dsi_s_wuxga_7_0_enable(struct device *dev)
 	usleep_range(7000, 8000);
 
 #if DSI_PANEL_RESET
-	if (!tegra_dc_initialized(dev)) {
+	if (!tegra_dc_bl_initialized(dev)) {
 		err = gpio_direction_output(en_panel_rst, 1);
 		if (err < 0) {
 			pr_err("setting display reset gpio value failed\n");

@@ -71,7 +71,7 @@ static void tegra_dpaux_reset(struct tegra_dc_dpaux_data *dpaux)
 		return;
 
 	/* Seamless prevent reset */
-	if (dpaux->dc->initialized)
+	if (dpaux->dc->bl_initialized)
 		return;
 
 	if (dpaux->rst) {

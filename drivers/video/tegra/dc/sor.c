@@ -1378,7 +1378,7 @@ void tegra_sor_hdmi_pad_power_up(struct tegra_dc_sor_data *sor)
 	int ret = 0;
 
 	/* seamless */
-	if (sor->dc->initialized)
+	if (sor->dc->bl_initialized)
 		return;
 
 	tegra_sor_write_field(sor, nv_sor_pll2_reg,
@@ -1896,7 +1896,7 @@ void tegra_sor_cal(struct tegra_dc_sor_data *sor)
 	u32 nv_sor_pll1_reg = nv_sor_pll1();
 	u32 nv_sor_pll2_reg = nv_sor_pll2();
 
-	if (sor->dc->initialized)
+	if (sor->dc->bl_initialized)
 		return;
 
 	/* For HDMI, rterm calibration is currently enabled only on T19x. */
@@ -1952,7 +1952,7 @@ void tegra_sor_config_xbar(struct tegra_dc_sor_data *sor)
 
 void tegra_dc_sor_enable_dp(struct tegra_dc_sor_data *sor)
 {
-	if (!sor->dc->initialized) {
+	if (!sor->dc->bl_initialized) {
 		tegra_sor_cal(sor);
 		tegra_sor_dp_pad_power_up(sor);
 		tegra_sor_power_lanes(sor, sor->link_cfg->lane_count, true);
@@ -1968,7 +1968,7 @@ static void tegra_dc_sor_enable_sor(struct tegra_dc_sor_data *sor, bool enable)
 	struct tegra_dc *dc = sor->dc;
 
 	/* Do not disable SOR during seamless boot */
-	if (dc->initialized && !enable)
+	if (dc->bl_initialized && !enable)
 		return;
 
 	if (tegra_dc_is_t21x()) {
@@ -2401,7 +2401,7 @@ void tegra_sor_setup_clk(struct tegra_dc_sor_data *sor, struct clk *clk,
 			return;
 		}
 		/* Change for seamless */
-		if (!dc->initialized) {
+		if (!dc->bl_initialized) {
 			parent_clk_rate = dc->mode.pclk;
 			/*
 			 * For t18x plldx cannot go below 27MHz.
@@ -2446,7 +2446,7 @@ void tegra_sor_precharge_lanes(struct tegra_dc_sor_data *sor)
 
 void tegra_dc_sor_modeset_notifier(struct tegra_dc_sor_data *sor, bool is_lvds)
 {
-	if (sor->dc->initialized)
+	if (sor->dc->bl_initialized)
 		return;
 
 	if (!sor->clk_type)

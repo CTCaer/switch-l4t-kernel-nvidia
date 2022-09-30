@@ -90,7 +90,7 @@ static int dsi_o_720p_6_0_enable(struct device *dev)
 	else
 		pr_warn("rst gpio is not defined in DT\n");
 
-	if (!tegra_dc_initialized(dev))
+	if (!tegra_dc_bl_initialized(dev))
 		gpio_direction_output(en_panel_rst, 0);
 
 	if (pavdd_lcd_reg) {
@@ -110,7 +110,7 @@ static int dsi_o_720p_6_0_enable(struct device *dev)
 	}
 	msleep(20);
 
-	if (!tegra_dc_initialized(dev))
+	if (!tegra_dc_bl_initialized(dev))
 		gpio_set_value(en_panel_rst, 1);
 
 	return 0;

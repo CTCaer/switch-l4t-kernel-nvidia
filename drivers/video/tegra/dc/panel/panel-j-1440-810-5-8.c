@@ -438,7 +438,7 @@ static int dsi_j_1440_810_5_8_enable(struct device *dev)
 	else
 		en_panel = DSI_PANEL_EN_GPIO;
 
-	if (!tegra_dc_initialized(dev)) {
+	if (!tegra_dc_bl_initialized(dev)) {
 		gpio_direction_output(en_panel_rst, 0);
 		gpio_direction_output(en_panel, 0);
 	}
@@ -480,7 +480,7 @@ static int dsi_j_1440_810_5_8_enable(struct device *dev)
 	}
 	usleep_range(3000, 5000);
 
-	if (!tegra_dc_initialized(dev)) {
+	if (!tegra_dc_bl_initialized(dev)) {
 		gpio_direction_output(en_panel_rst, 1);
 		msleep(20);
 		gpio_set_value(en_panel, 1);

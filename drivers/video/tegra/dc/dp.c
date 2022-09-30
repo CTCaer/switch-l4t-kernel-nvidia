@@ -2208,7 +2208,7 @@ static int tegra_dc_dp_init(struct tegra_dc *dc)
 		dp->sor = ((struct tegra_dc_dp_data *)dc->out_data)->sor;
 	} else {
 		dp->sor = tegra_dc_sor_init(dc, &dp->link_cfg);
-		if (dc->initialized)
+		if (dc->bl_initialized)
 			dp->sor->clk_type = TEGRA_SOR_MACRO_CLK;
 	}
 	dp->irq = irq;
@@ -2859,7 +2859,7 @@ static void tegra_dp_prepare_pad(struct tegra_dc_dp_data *dp)
 	struct tegra_dc *dc = dp->dc;
 	struct tegra_dc_sor_data *sor = dp->sor;
 
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		tegra_sor_reset(sor);
 
 		/*
@@ -2879,7 +2879,7 @@ static void tegra_dp_prepare_pad(struct tegra_dc_dp_data *dp)
 
 	tegra_sor_clk_enable(sor);
 
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		tegra_sor_write_field(sor, NV_SOR_CLK_CNTRL,
 			NV_SOR_CLK_CNTRL_DP_CLK_SEL_MASK,
 			NV_SOR_CLK_CNTRL_DP_CLK_SEL_DIFF_DPCLK);
@@ -2907,7 +2907,7 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 		tegra_sor_program_fpga_clk_mux(sor);
 
 	/* Change for seamless */
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		ret = tegra_dp_panel_power_state(dp,
 					NV_DPCD_SET_POWER_VAL_D0_NORMAL);
 		if (ret < 0) {
@@ -2962,7 +2962,7 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 	tegra_dc_dp_dpcd_write(dp, NV_DPCD_MAIN_LINK_CHANNEL_CODING_SET,
 			NV_DPCD_MAIN_LINK_CHANNEL_CODING_SET_ANSI_8B10B);
 
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		tegra_sor_write_field(sor, NV_SOR_DP_CONFIG(sor->portnum),
 				NV_SOR_DP_CONFIG_IDLE_BEFORE_ATTACH_ENABLE,
 				NV_SOR_DP_CONFIG_IDLE_BEFORE_ATTACH_ENABLE);
@@ -2992,7 +2992,7 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 	tegra_sor_config_xbar(dp->sor);
 
 	/* Select the macro feedback clock. */
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		if (tegra_dc_is_nvdisplay()) {
 			tegra_sor_clk_switch_setup(sor, true);
 			tegra_dp_set_sor_clk_src(dp, sor->pad_clk);
@@ -3013,7 +3013,7 @@ static void tegra_dc_dp_enable(struct tegra_dc *dc)
 
 	if (likely(dc->out->type != TEGRA_DC_OUT_FAKE_DP) &&
 		!no_lt_at_unblank) {
-		if (!dc->initialized) {
+		if (!dc->bl_initialized) {
 			tegra_dp_lt_set_pending_evt(&dp->lt_data);
 			ret = tegra_dp_lt_wait_for_completion(&dp->lt_data,
 						STATE_DONE_PASS, LT_TIMEOUT_MS);
@@ -3246,7 +3246,7 @@ static long tegra_dc_dp_setup_clk(struct tegra_dc *dc, struct clk *clk)
 		tegra_sor_safe_clk_enable(sor);
 
 		/* Change for seamless */
-		if (!dc->initialized)
+		if (!dc->bl_initialized)
 			clk_set_parent(sor->sor_clk, sor->safe_clk);
 
 		tegra_disp_clk_prepare_enable(sor->pad_clk);
@@ -3367,7 +3367,7 @@ static void tegra_dc_dp_modeset_notifier(struct tegra_dc *dc)
 	struct tegra_dc_dpaux_data *dpaux = dp->dpaux;
 
 	/* In case of seamless display, kernel carries forward BL config */
-	if (dc->initialized)
+	if (dc->bl_initialized)
 		return;
 
 	tegra_dc_io_start(dc);

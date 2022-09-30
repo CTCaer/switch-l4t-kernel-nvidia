@@ -117,7 +117,7 @@ static int dsi_a_1200_1920_8_0_enable(struct device *dev)
 
 	msleep(20);
 #if DSI_PANEL_RESET
-	if (!tegra_dc_initialized(dev)) {
+	if (!tegra_dc_bl_initialized(dev)) {
 		gpio_direction_output(en_panel_rst, 1);
 		usleep_range(1000, 5000);
 		gpio_set_value(en_panel_rst, 0);
