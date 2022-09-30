@@ -263,8 +263,9 @@ struct tegra_dsi_padctrl *tegra_dsi_padctrl_init(struct tegra_dc *dc)
 			goto iounmap;
 		}
 
-		/* Reset dsi padctrl module */
-		tegra_dsi_padctrl_reset(dsi_padctrl);
+		/* Reset dsi padctrl module if not initialized by bootloader */
+		if (!dc->bl_initialized)
+			tegra_dsi_padctrl_reset(dsi_padctrl);
 	}
 
 	dsi_padctrl->prod_list = devm_tegra_prod_get_from_node(&dc->ndev->dev,
