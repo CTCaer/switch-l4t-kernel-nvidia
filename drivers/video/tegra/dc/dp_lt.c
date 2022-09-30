@@ -1116,7 +1116,7 @@ void tegra_dp_lt_init(struct tegra_dp_lt_data *lt_data,
 
 	/* Change for seamless */
 	if (tegra_dc_hpd(dp->dc) &&
-		dp->dc->initialized) {
+		dp->dc->bl_initialized) {
 		lt_data->state = STATE_DONE_PASS;
 		/* Set config valid to false */
 		/* So that fresh LT starts   */

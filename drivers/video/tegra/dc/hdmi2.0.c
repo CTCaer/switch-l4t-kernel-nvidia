@@ -1695,7 +1695,7 @@ static int tegra_dc_hdmi_init(struct tegra_dc *dc)
 			 (dc->pdata->flags & TEGRA_DC_FLAG_SET_EARLY_MODE))) &&
 			dc->out && (dc->out->type == TEGRA_DC_OUT_HDMI)) {
 		/* In case of seamless display, dc mode would already be set */
-		if (!dc->initialized)
+		if (!dc->bl_initialized)
 			tegra_dc_set_fbcon_boot_mode(dc, hdmi->edid);
 	}
 
@@ -1934,7 +1934,7 @@ static int tegra_hdmi_find_cea_vic(struct tegra_hdmi *hdmi)
 	unsigned best = 0;
 	u32 modedb_size = tegra_hdmi_get_cea_modedb_size(hdmi);
 
-	if (dc->initialized) {
+	if (dc->bl_initialized) {
 		u32 vic = tegra_sor_readl(hdmi->sor,
 			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_HIGH) & 0xff;
 		if (!vic)
@@ -2000,7 +2000,7 @@ static u32 tegra_hdmi_get_aspect_ratio(struct tegra_hdmi *hdmi)
 	 * set AVI Infoframe parameters
 	 */
 	if ((aspect_ratio == HDMI_AVI_ASPECT_RATIO_NO_DATA) &&
-					(hdmi->dc->initialized)) {
+					(hdmi->dc->bl_initialized)) {
 		u32 temp = 0;
 		temp = tegra_sor_readl(hdmi->sor,
 			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_LOW);
@@ -2027,7 +2027,7 @@ static u32 tegra_hdmi_get_rgb_ycc(struct tegra_hdmi *hdmi)
 	 * For seamless HDMI, read YUV flag parameters from bootloader
 	 * set AVI Infoframe parameters
 	 */
-	if (hdmi->dc->initialized) {
+	if (hdmi->dc->bl_initialized) {
 		u32 temp = 0;
 		temp = tegra_sor_readl(hdmi->sor,
 			NV_SOR_HDMI_AVI_INFOFRAME_SUBPACK0_LOW);
@@ -2076,7 +2076,7 @@ static u32 tegra_hdmi_get_rgb_quant(struct tegra_hdmi *hdmi)
 	 * For seamless HDMI, read Q0/Q1 from bootloader
 	 * set AVI Infoframe packet contents of the HDMI SPEC
 	 */
-	if (hdmi->dc->initialized) {
+	if (hdmi->dc->bl_initialized) {
 		u32 temp = 0;
 
 		dev_info(&hdmi->dc->ndev->dev, "hdmi: get RGB quant from REG programmed by BL.\n");
@@ -2114,7 +2114,7 @@ static u32 tegra_hdmi_get_ycc_quant(struct tegra_hdmi *hdmi)
 	 * For seamless HDMI, read YQ1/YQ1 from bootloader
 	 * set AVI Infoframe packet contents of the HDMI SPEC
 	 */
-	if (hdmi->dc->initialized) {
+	if (hdmi->dc->bl_initialized) {
 		u32 temp = 0;
 
 		dev_info(&hdmi->dc->ndev->dev, "hdmi: get YCC quant from REG programmed by BL.\n");
@@ -2260,7 +2260,7 @@ static void tegra_hdmi_avi_infoframe(struct tegra_hdmi *hdmi)
 		return;
 
 	/* disable avi infoframe before configuring except for seamless case */
-	if (!hdmi->dc->initialized)
+	if (!hdmi->dc->bl_initialized)
 		tegra_sor_writel(sor, NV_SOR_HDMI_AVI_INFOFRAME_CTRL, 0);
 
 	tegra_hdmi_avi_infoframe_update(hdmi);
@@ -2728,7 +2728,7 @@ static int _tegra_hdmi_v2_x_config(struct tegra_hdmi *hdmi)
 	/* disable hdmi2.x config on host and monitor only
 	 * if bootloader didn't initialize hdmi
 	 */
-	if (!hdmi->dc->initialized) {
+	if (!hdmi->dc->bl_initialized) {
 		tegra_hdmi_v2_x_mon_config(hdmi, false);
 		tegra_hdmi_v2_x_host_config(hdmi, false);
 	}
@@ -2991,7 +2991,7 @@ static int tegra_hdmi_controller_enable(struct tegra_hdmi *hdmi)
 	else
 		tegra_dc_enable_disp_ctrl_mode(dc);
 
-	if (dc->initialized) {
+	if (dc->bl_initialized) {
 		/* only at boot time, enable hdcp if valid edid */
 		if (!tegra_edid_get_monspecs(hdmi->edid, &hdmi->mon_spec))
 			tegra_nvhdcp_set_plug(hdmi->nvhdcp, true);
@@ -3094,7 +3094,7 @@ static void tegra_hdmi_config_clk_nvdisplay(struct tegra_hdmi *hdmi,
 		clk_set_parent(sor->sor_clk, sor->pad_clk);
 		hdmi->clk_type = TEGRA_HDMI_BRICK_CLK;
 	} else if (clk_type == TEGRA_HDMI_SAFE_CLK) {
-		if (!hdmi->dc->initialized) {
+		if (!hdmi->dc->bl_initialized) {
 			clk_set_parent(hdmi->sor->sor_clk, hdmi->sor->safe_clk);
 			hdmi->clk_type = TEGRA_HDMI_SAFE_CLK;
 		}
@@ -3161,7 +3161,7 @@ static void tegra_hdmi_config_clk_t21x(struct tegra_hdmi *hdmi, u32 clk_type)
 
 		hdmi->clk_type = TEGRA_HDMI_BRICK_CLK;
 	} else if (clk_type == TEGRA_HDMI_SAFE_CLK) {
-		if (!hdmi->dc->initialized) {
+		if (!hdmi->dc->bl_initialized) {
 			/* Select sor clock muxes */
 #ifdef CONFIG_TEGRA_CLK_FRAMEWORK
 			tegra_clk_cfg_ex(hdmi->sor->sor_clk,
@@ -3238,7 +3238,7 @@ static long tegra_dc_hdmi_setup_clk_nvdisplay(struct tegra_dc *dc,
 		dc->mode.pclk = tegra_hdmi_get_pclk(&dc->mode);
 
 	/* Set rate on PARENT */
-	if (!dc->initialized) {
+	if (!dc->bl_initialized) {
 		/*
 		 * For RGB/YUV444 12bpc, the pclk:orclk ratio should be 2:3.
 		 * The SOR refclk vs. pclk dividers should be in a 2:3 ratio if
@@ -3259,13 +3259,13 @@ static long tegra_dc_hdmi_setup_clk_nvdisplay(struct tegra_dc *dc,
 	tegra_sor_safe_clk_enable(sor);
 	clk_set_parent(sor->ref_clk, parent_clk);
 
-	if (!dc->initialized)
+	if (!dc->bl_initialized)
 		tegra_sor_set_ref_clk_rate(sor);
 
 	if (atomic_inc_return(&hdmi->clock_refcount) == 1)
 		tegra_sor_clk_enable(sor);
 
-	if (!dc->initialized)
+	if (!dc->bl_initialized)
 		clk_set_parent(sor->sor_clk, sor->safe_clk);
 
 	tegra_disp_clk_prepare_enable(sor->pad_clk);
@@ -3332,7 +3332,7 @@ static long tegra_dc_hdmi_setup_clk_t21x(struct tegra_dc *dc, struct clk *clk)
 		tegra_dc_hdmi_configure_ss(dc, clk);
 	}
 
-	if (dc->initialized)
+	if (dc->bl_initialized)
 		goto skip_setup;
 	if (clk_get_rate(parent_clk) != dc->mode.pclk)
 		clk_set_rate(parent_clk, dc->mode.pclk);
@@ -3588,7 +3588,7 @@ static void tegra_dc_hdmi_modeset_notifier(struct tegra_dc *dc)
 	struct tegra_hdmi *hdmi = tegra_dc_get_outdata(dc);
 
 	/* In case of seamless display, kernel carries forward BL config */
-	if (dc->initialized)
+	if (dc->bl_initialized)
 		return;
 
 	tegra_hdmi_get(dc);

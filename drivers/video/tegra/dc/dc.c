@@ -682,7 +682,7 @@ inline bool tegra_dc_in_cmode(struct tegra_dc *dc)
 }
 EXPORT_SYMBOL(tegra_dc_in_cmode);
 
-bool tegra_dc_initialized(struct device *dev)
+bool tegra_dc_bl_initialized(struct device *dev)
 {
 	struct platform_device *ndev = NULL;
 	struct tegra_dc *dc = NULL;
@@ -692,11 +692,11 @@ bool tegra_dc_initialized(struct device *dev)
 	if (ndev)
 		dc = platform_get_drvdata(ndev);
 	if (dc)
-		return dc->initialized;
+		return dc->bl_initialized;
 	else
 		return false;
 }
-EXPORT_SYMBOL(tegra_dc_initialized);
+EXPORT_SYMBOL(tegra_dc_bl_initialized);
 
 void tegra_dc_hold_dc_out(struct tegra_dc *dc)
 {
@@ -4043,7 +4043,7 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out,
 	}
 
 	if (initialized) {
-		dc->initialized = false;
+		dc->bl_initialized = false;
 		goto bypass_init_check;
 	}
 
@@ -4070,17 +4070,17 @@ static int tegra_dc_set_out(struct tegra_dc *dc, struct tegra_dc_out *out,
 	 */
 	if (dc->out->type == TEGRA_DC_OUT_DSI &&
 			!tegra_is_bl_display_initialized(dc->ctrl_num)) {
-		dc->initialized = false;
+		dc->bl_initialized = false;
 	} else if (dc->out->type == TEGRA_DC_OUT_DSI &&
 			tegra_is_bl_display_initialized(dc->ctrl_num)) {
 		/*
 		 * In case of dsi->csi loopback support, force re-initialize
-		 * all DSI controllers. So, set dc->initialized to false.
+		 * all DSI controllers. So, set dc->bl_initialized to false.
 		 */
 		if (dc->out->dsi->dsi_csi_loopback)
-			dc->initialized = false;
+			dc->bl_initialized = false;
 		else
-			dc->initialized = true;
+			dc->bl_initialized = true;
 	}
 #endif
 	mode = tegra_dc_get_override_mode(dc);
@@ -4098,7 +4098,7 @@ bypass_init_check:
 				dc->mode.h_active, dc->mode.v_active,
 				dc->out->h_size, dc->out->v_size,
 				dc->mode.pclk);
-		dc->initialized = true;
+		dc->bl_initialized = true;
 	} else if (out->n_modes > 0) {
 		/* For VRR panels, default mode is first in the list,
 		 * and native panel mode is the last.
@@ -5590,7 +5590,7 @@ static int tegra_dc_init(struct tegra_dc *dc)
 	trace_display_mode(dc, &dc->mode);
 
 	if (dc->mode.pclk) {
-		if (!dc->initialized) {
+		if (!dc->bl_initialized) {
 			if (tegra_dc_program_mode(dc, &dc->mode)) {
 				tegra_dc_io_end(dc);
 				dev_warn(&dc->ndev->dev,
@@ -6905,7 +6905,7 @@ static int tegra_dc_probe(struct platform_device *ndev)
 	 * Overriding the display mode only applies for modes set up during
 	 * boot. It should not apply for e.g. HDMI hotplug.
 	 */
-	dc->initialized = false;
+	dc->bl_initialized = false;
 
 	/*
 	 * Initialize vedid state. This is placed here
@@ -7298,7 +7298,7 @@ int  tegra_dc_get_disphead_sts(int dcid, struct tegra_dc_head_status *pSts)
 	if (dc) {
 		pSts->magic = TEGRA_DC_HEAD_STATUS_MAGIC1;
 		pSts->irqnum = dc->irq;
-		pSts->init = dc->initialized ? 1 : 0;
+		pSts->init = dc->bl_initialized ? 1 : 0;
 		pSts->connected = dc->connected ? 1 : 0;
 		pSts->active = dc->enabled ? 1 : 0;
 		return 0;
