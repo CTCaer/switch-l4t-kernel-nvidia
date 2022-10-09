@@ -3099,7 +3099,7 @@ struct snd_soc_dai_link *tegra_machine_new_codec_links(
 	unsigned int *pnum_codec_links)
 {
 	unsigned int i, j, num_codec_links;
-	struct device_node *np = pdev->dev.of_node, *subnp;
+	struct device_node *np = pdev->dev.of_node, *subnp = NULL;
 	struct snd_soc_pcm_stream *params;
 	char dai_link_name[MAX_STR_SIZE];
 	char *str;
@@ -3304,7 +3304,7 @@ struct snd_soc_codec_conf *tegra_machine_new_codec_conf(
 	unsigned int *pnum_codec_links)
 {
 	unsigned int i, num_codec_links;
-	struct device_node *np = pdev->dev.of_node, *subnp;
+	struct device_node *np = pdev->dev.of_node, *subnp = NULL;
 	struct device_node *of_node;
 	char dai_link_name[MAX_STR_SIZE];
 
