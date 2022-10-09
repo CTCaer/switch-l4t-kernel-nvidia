@@ -4066,39 +4066,54 @@ static void tegra_dsi_bl_on(struct tegra_dc_dsi_data *dsi)
 {
 	struct backlight_device *bd =
 				get_backlight_device_by_name(dsi->info.bl_name);
+	int mode = 0;
 
-	if (!bd)
-		return;
+	if (!bd) {
+		/* Check if panel driver registered a backlight */
+		if (!dsi->info.bl)
+			return;
+
+		bd = dsi->info.bl;
+
+		/*
+		 * If backlight is controlled via dcs it's not possible
+		 * to set it via vblank cmd right after init.
+		 * Temporarily inform bl device that we are in cmd mode.
+		 */
+		if (dsi->info.dcs_controlled_bl) {
+			mode = dsi->status.vtype;
+			dsi->status.vtype = DSI_VIDEO_TYPE_CMD_MODE;
+		}
+	}
 
 	/* Restore previous setting if possible */
 	backlight_update_status(bd);
+
+	/* Restore mode */
+	if (dsi->info.dcs_controlled_bl)
+		dsi->status.vtype = mode;
 }
 
 static void tegra_dsi_bl_off(struct tegra_dc_dsi_data *dsi)
 {
 	struct backlight_device *bd =
 				get_backlight_device_by_name(dsi->info.bl_name);
-	struct platform_driver *pdrv = NULL;
-	struct platform_device *pdev = NULL;
+	int brightness;
 
 	if (!bd)
 		return;
-
-	if (bd->dev.parent) {
-		pdrv = to_platform_driver(bd->dev.parent->driver);
-		pdev = to_platform_device(bd->dev.parent);
-	}
 	
+	brightness = bd->props.brightness;
+
+	/* Disable backlight */
+	bd->props.brightness = 0;
+	backlight_update_status(bd);
+
 	/*
-	 * To avoid confusing userspace, utilize backlight disable,
-	 * for avoiding the change to current brightness if possible.
+	 * To avoid confusing userspace, restore brightness value,
+	 * while not informing backlight driver.
 	 */
-	if (pdrv && pdev && pdrv->shutdown) {
-		pdrv->shutdown(pdev);
-	} else {
-		bd->props.brightness = 0;
-		backlight_update_status(bd);
-	}
+	bd->props.brightness = brightness;
 }
 
 static int tegra_dsi_enter_ulpm(struct tegra_dc_dsi_data *dsi)
@@ -4411,6 +4426,10 @@ static void tegra_dc_dsi_postpoweron(struct tegra_dc *dc)
 fail:
 	tegra_dc_io_end(dc);
 	mutex_unlock(&dsi->lock);
+
+	/* enable/restore backlight state */
+	if (dsi->enabled)
+		tegra_dsi_bl_on(dsi);
 }
 
 static void __tegra_dc_dsi_init(struct tegra_dc *dc)

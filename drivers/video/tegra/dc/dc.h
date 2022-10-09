@@ -413,6 +413,8 @@ struct tegra_dsi_out {
 	struct dsi_phy_timing_ns phy_timing;
 
 	u8		*bl_name;
+	struct backlight_device *bl;
+	bool   dcs_controlled_bl;
 
 	bool		lp00_pre_panel_wakeup;
 	bool		ulpm_not_supported;
