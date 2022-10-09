@@ -571,7 +571,7 @@ int nvhost_tsec_finalize_poweron(struct platform_device *dev)
 	int err = 0;
 	struct flcn *m;
 	struct mc_carveout_info inf;
-	u32 gsc_base_addr;
+	u32 co_data_base_addr;
 	struct nvhost_device_data *pdata = platform_get_drvdata(dev);
 
 	err = nvhost_tsec_init_sw(dev);
@@ -597,9 +597,11 @@ int nvhost_tsec_finalize_poweron(struct platform_device *dev)
 	nvhost_flcn_start(dev, TSEC_RESERVE);
 	if (nvhost_is_210()) {
 		/* Populate DEBUGINFO with gsc carveout address */
-		mc_get_carveout_info(&inf, NULL, MC_SECURITY_CARVEOUT4);
-		gsc_base_addr =  inf.base >> 8;
-		host1x_writel(dev, flcn_debuginfo_r(), gsc_base_addr);
+		mc_get_carveout_info(&inf, NULL, pdata->carveout_idx);
+		co_data_base_addr = inf.base >> 8;
+		if (pdata->carveout_use_top)
+			co_data_base_addr += (inf.size >> 8) - 1;
+		host1x_writel(dev, flcn_debuginfo_r(), co_data_base_addr);
 	}
 
 	nvhost_flcn_irq_mask_set(dev);
