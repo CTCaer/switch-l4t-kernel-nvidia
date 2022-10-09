@@ -27,6 +27,7 @@
 #define NVMAP_HEAP_IOVMM   (1ul<<30)
 
 /* common carveout heaps */
+#define NVMAP_HEAP_CARVEOUT_IRAM    (1ul<<29)
 #define NVMAP_HEAP_CARVEOUT_VPR     (1ul<<28)
 #define NVMAP_HEAP_CARVEOUT_TSEC    (1ul<<27)
 #define NVMAP_HEAP_CARVEOUT_VIDMEM  (1ul<<26)
@@ -62,6 +63,11 @@ static inline ulong nvmap_page_pool_get_unused_pages(void)
 #endif
 
 ulong nvmap_iovmm_get_used_pages(void);
+ulong nvmap_carveout_iram_get_used_pages(void);
+ulong nvmap_carveout_vpr_get_used_pages(void);
+ulong nvmap_carveout_vidmem_get_used_pages(void);
+ulong nvmap_carveout_gen_get_used_pages(void);
+ulong nvmap_carveout_total_get_used_pages(void);
 int nvmap_register_vidmem_carveout(struct device *dma_dev,
 		phys_addr_t base, size_t size);
 
