@@ -715,6 +715,46 @@ ulong nvmap_iovmm_get_used_pages(void)
 	return total >> PAGE_SHIFT;
 }
 
+ulong nvmap_carveout_iram_get_used_pages(void)
+{
+	u64 total;
+
+	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_CARVEOUT_IRAM);
+	return total >> PAGE_SHIFT;
+}
+
+ulong nvmap_carveout_vpr_get_used_pages(void)
+{
+	u64 total;
+
+	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_CARVEOUT_VPR);
+	return total >> PAGE_SHIFT;
+}
+
+ulong nvmap_carveout_vidmem_get_used_pages(void)
+{
+	u64 total;
+
+	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_CARVEOUT_VIDMEM);
+	return total >> PAGE_SHIFT;
+}
+
+ulong nvmap_carveout_gen_get_used_pages(void)
+{
+	u64 total;
+
+	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_CARVEOUT_GENERIC);
+	return total >> PAGE_SHIFT;
+}
+
+ulong nvmap_carveout_total_get_used_pages(void)
+{
+	u64 total;
+
+	nvmap_get_total_mss(NULL, &total, NVMAP_HEAP_CARVEOUT_MASK);
+	return total >> PAGE_SHIFT;
+}
+
 static void nvmap_iovmm_debugfs_init(void)
 {
 	if (!IS_ERR_OR_NULL(nvmap_dev->debug_root)) {
