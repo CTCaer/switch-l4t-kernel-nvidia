@@ -1,7 +1,7 @@
 /*
  * tegra_machine_driver_mobile.c - Tegra ASoC Machine driver for mobile
  *
- * Copyright (c) 2017-2019 NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2017-2020 NVIDIA CORPORATION.  All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -321,7 +321,7 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 	pr_debug("pll_a_out0 = %u Hz, aud_mclk = %u Hz, sample rate = %u Hz\n",
 		 machine->audio_clock.set_pll_out_rate, aud_mclk, srate);
 
-	err = tegra_machine_set_params(card, machine, rate, channels, formats);
+	err = tegra_machine_set_params(card, machine, srate, channels, formats);
 	if (err < 0)
 		return err;
 
@@ -330,7 +330,6 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 		dai_params =
 		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
 
-		dai_params->rate_min = srate;
 		dai_params->formats = (machine->fmt_via_kcontrol == 2) ?
 			(1ULL << SNDRV_PCM_FORMAT_S32_LE) : formats;
 
@@ -347,7 +346,6 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 		dai_params =
 		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
 
-		dai_params->rate_min = srate;
 		dai_params->formats = (machine->fmt_via_kcontrol == 2) ?
 			(1ULL << SNDRV_PCM_FORMAT_S32_LE) : formats;
 
@@ -359,55 +357,9 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 		}
 	}
 
-	rtd = snd_soc_get_pcm_runtime(card, "spdif-dit-0");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		dai_params->rate_min = srate;
-	}
-
-	rtd = snd_soc_get_pcm_runtime(card, "spdif-dit-1");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		dai_params->rate_min = srate;
-	}
-
-	/* set clk rate for i2s3 dai link*/
-	rtd = snd_soc_get_pcm_runtime(card, "spdif-dit-2");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		dai_params->rate_min = srate;
-	}
-
-	rtd = snd_soc_get_pcm_runtime(card, "spdif-dit-3");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		dai_params->rate_min = srate;
-	}
-
-	rtd = snd_soc_get_pcm_runtime(card, "spdif-dit-5");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		/* update link_param to update hw_param for DAPM */
-		dai_params->rate_min = srate;
-		dai_params->channels_min = channels;
-		dai_params->formats = formats;
-	}
 
 	rtd = snd_soc_get_pcm_runtime(card, "dspk-playback-r");
 	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
 		if (!strcmp(rtd->codec_dai->name, "tas2552-amplifier")) {
 			err = snd_soc_dai_set_sysclk(rtd->codec_dai,
 				TAS2552_PDM_CLK_IVCLKIN, aud_mclk,
@@ -421,9 +373,6 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 
 	rtd = snd_soc_get_pcm_runtime(card, "dspk-playback-l");
 	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
 		if (!strcmp(rtd->codec_dai->name, "tas2552-amplifier")) {
 			err = snd_soc_dai_set_sysclk(rtd->codec_dai,
 				TAS2552_PDM_CLK_IVCLKIN, aud_mclk,
@@ -433,16 +382,6 @@ static int tegra_machine_dai_init(struct snd_soc_pcm_runtime *runtime,
 				return err;
 			}
 		}
-	}
-
-	rtd = snd_soc_get_pcm_runtime(card, "fe-pi-audio-z-v2");
-	if (rtd) {
-		dai_params =
-		(struct snd_soc_pcm_stream *)rtd->dai_link->params;
-
-		dai_params->rate_min = srate;
-		dai_params->channels_min = channels;
-		dai_params->formats = formats;
 	}
 
 	return 0;
@@ -550,6 +489,25 @@ static int tegra_machine_compr_set_params(struct snd_compr_stream *cstream)
 	return 0;
 }
 #endif
+
+static int tegra_machine_respeaker_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct device *dev = rtd->card->dev;
+	int err;
+
+	/* ac108 codec driver hardcodes the freq as 24000000
+	 * and source as PLL irrespective of args passed through
+	 * this callback
+	 */
+	err = snd_soc_dai_set_sysclk(rtd->codec_dai, 0, 24000000,
+				     SND_SOC_CLOCK_IN);
+	if (err) {
+		dev_err(dev, "failed to set ac108 sysclk!\n");
+		return err;
+	}
+
+	return 0;
+}
 
 static int tegra_machine_fepi_init(struct snd_soc_pcm_runtime *rtd)
 {
@@ -669,6 +627,8 @@ static int codec_init(struct platform_device *pdev, struct tegra_machine *machin
 		}
 		else if (strstr(dai_links[i].name, "fe-pi-audio-z-v2"))
 			dai_links[i].init = tegra_machine_fepi_init;
+		else if (strstr(dai_links[i].name, "respeaker-4-mic-array"))
+			dai_links[i].init = tegra_machine_respeaker_init;
 	}
 
 	return 0;
