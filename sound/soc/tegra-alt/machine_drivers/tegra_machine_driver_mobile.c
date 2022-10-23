@@ -165,6 +165,11 @@ static const struct snd_soc_dapm_widget tegra_machine_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("c Mic", NULL),
 	SND_SOC_DAPM_MIC("d Mic", NULL),
 	SND_SOC_DAPM_MIC("s Mic", NULL),
+
+	SND_SOC_DAPM_LINE("x Line Out", NULL),
+	SND_SOC_DAPM_LINE("y Line Out", NULL),
+	SND_SOC_DAPM_LINE("x Line In", NULL),
+	SND_SOC_DAPM_LINE("y Line In", NULL),
 };
 
 #if IS_ENABLED(CONFIG_SND_SOC_TEGRA186_ASRC_ALT)
