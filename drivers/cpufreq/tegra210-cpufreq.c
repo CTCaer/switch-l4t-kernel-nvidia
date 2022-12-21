@@ -63,7 +63,8 @@ static struct tegra_cpufreq_priv *tfreq_priv;
 
 static struct kobject *cpufreq_kobject;
 static bool overclock_enabled = false;
-static unsigned int default_max_freq = 0;
+static unsigned int max_freq;
+static unsigned int safe_max_freq;
 
 static ssize_t overclock_show(struct kobject *kobj, struct kobj_attribute *attr,
 					   char *buf)
@@ -135,8 +136,11 @@ static int tegra_boundaries_policy_notifier(struct notifier_block *nb,
 	policy->min = max(policy->min, qmin);
 	policy->max = min(policy->max, qmax);
 
-	if (!overclock_enabled)
-		policy->max = min(default_max_freq, policy->max);
+	if (!overclock_enabled && safe_max_freq)
+		policy->max = min(safe_max_freq, policy->max);
+
+	if (max_freq)
+		policy->max = min(max_freq, policy->max);
 
 	if (policy->min > policy->max)
 		policy->min = policy->max;
@@ -282,7 +286,8 @@ static int cpufreq_table_make_from_dt(void)
 		goto err_out;
 	}
 
-	if (!of_property_read_u32(np, "default-max-frequency", &default_max_freq)) {
+	if (!of_property_read_u32(np, "max-safe-frequency", &safe_max_freq) ||
+		!of_property_read_u32(np, "default-max-frequency", &safe_max_freq)) {
 		cpufreq_kobject = kobject_create_and_add("tegra_cpufreq",
 							 kernel_kobj);
 		if(!cpufreq_kobject)
@@ -291,7 +296,12 @@ static int cpufreq_table_make_from_dt(void)
 		ret = sysfs_create_file(cpufreq_kobject, &overclock_attribute.attr);
 		if (ret)
 			return -ENOMEM;	
+	} else {
+		safe_max_freq = 0;
 	}
+
+	if (of_property_read_u32(np, "max-frequency", &max_freq))
+		max_freq = 0;
 
 	if (WARN_ON(freqs_num >= CPU_FREQ_TABLE_MAX_SIZE)) {
 		ret = -EINVAL;
