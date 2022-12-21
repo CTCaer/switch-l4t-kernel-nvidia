@@ -447,7 +447,7 @@ static inline void tegra_dp_set_outdata(struct tegra_dc_dp_data *dp,
 #define NV_DPCD_HDCP_STRMID_TYPE                        (0x000693F5)
 #define NV_DPCD_HDCP_MPRIME                             (0x00069473)
 #define NV_DPCD_HDCP_RXSTATUS                           (0x00069493)
-#define NV_DPCD_HDCP_RSVD                               (0x00069494)
+#define NV_DPCD_HDCP_STRMCT_TYPE                        (0x00069494)
 #define NV_DPCD_HDCP_DBG                                (0x00069518)
 /* MegaChips STDP2550 branch specific registers */
 #define NV_DPCD_BRANCH_STDP_CEC_CTRL			(0x000005C0)

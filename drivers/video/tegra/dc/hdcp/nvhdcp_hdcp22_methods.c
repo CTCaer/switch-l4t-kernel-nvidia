@@ -520,25 +520,32 @@ int tsec_hdcp_revocation_check(struct hdcp_context_t *hdcp_context,
 			unsigned int port, unsigned int hdcp_version)
 {
 	int err = 0;
+	int srm_size = 0;
 	struct hdcp_revocation_check_param revocation_check_param;
 
-	if (!hdcp_context || !cmac || !tsec_address) {
+	if (!hdcp_context) {
 		hdcp_err("tsec_hdcp_revocation_check: null params sent!");
 		return -EINVAL;
 	}
+
+	srm_size = tsec_hdcp_srm_read(hdcp_context, hdcp_version);
+
+	if ((!cmac || !tsec_address) && hdcp_version == HDCP_1x)
+		return 0;
+
 	memset(&revocation_check_param, 0,
 			sizeof(struct hdcp_revocation_check_param));
 	memset(hdcp_context->cpuvaddr_mthd_buf_aligned, 0,
 		HDCP_MTHD_RPLY_BUF_SIZE);
-	revocation_check_param.srm_size = tsec_hdcp_srm_read(hdcp_context,
-							hdcp_version);
+	revocation_check_param.srm_size = srm_size;
 	revocation_check_param.trans_id.session_id = hdcp_context->session_id;
 	revocation_check_param.is_ver_hdcp2x = hdcp_version;
 	revocation_check_param.tsec_gsc_address = tsec_address;
 	revocation_check_param.port = port;
 
 	/* send the cmac generated from secure service */
-	memcpy(revocation_check_param.srm_cmac, cmac, HDCP_CMAC_SIZE);
+	if (cmac)
+		memcpy(revocation_check_param.srm_cmac, cmac, HDCP_CMAC_SIZE);
 	memcpy(hdcp_context->cpuvaddr_mthd_buf_aligned,
 		&revocation_check_param,
 		sizeof(struct hdcp_revocation_check_param));
@@ -566,7 +573,7 @@ int tsec_hdcp_verify_vprime(struct hdcp_context_t *hdcp_context,
 	u16 rxinfo;
 	u8 seq_num_start[HDCP_SIZE_SEQ_NUM_V_8] = {0x00, 0x00, 0x00};
 	struct hdcp_verify_vprime_param verify_vprime_param;
-	if (!cmac || !hdcp_context || !tsec_addr) {
+	if (!hdcp_context) {
 		hdcp_err("tsec_hdcp_verify_vprime: null params sent!");
 		return -EINVAL;
 	}
@@ -585,7 +592,8 @@ int tsec_hdcp_verify_vprime(struct hdcp_context_t *hdcp_context,
 		hdcp_context->msg.vprime,
 		HDCP_SIZE_VPRIME_2X_8/2);
 	verify_vprime_param.tsec_gsc_address = tsec_addr;
-	memcpy(verify_vprime_param.srm_cmac, cmac, HDCP_CMAC_SIZE);
+	if (cmac)
+		memcpy(verify_vprime_param.srm_cmac, cmac, HDCP_CMAC_SIZE);
 	verify_vprime_param.rxinfo = hdcp_context->msg.rxinfo;
 
 	verify_vprime_param.trans_id.session_id = hdcp_context->session_id;
