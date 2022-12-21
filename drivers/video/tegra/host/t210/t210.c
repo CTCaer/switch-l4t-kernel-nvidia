@@ -327,14 +327,13 @@ struct nvhost_device_data t21_tsec_info = {
 #if defined(CONFIG_TEGRA_BWMGR)
 	.bwmgr_client_id	= TEGRA_BWMGR_CLIENT_TSEC,
 #endif
-#ifndef CONFIG_TSEC_USE_WPR
+
 	.transcfg_addr		= 0,
 	.transcfg_val		= 0,
+#ifndef CONFIG_TSEC_USE_WPR
 	.carveout_idx		= MC_SECURITY_CARVEOUT4,
 	.carveout_use_top	= false,
 #else
-	.transcfg_addr		= 0x1644,
-	.transcfg_val		= 0x20,
 	.carveout_idx		= MC_SECURITY_CARVEOUT2,
 	.carveout_use_top	= true,
 #endif

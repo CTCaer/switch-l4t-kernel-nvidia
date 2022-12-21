@@ -88,10 +88,19 @@ static u8 otf_key[TSEC_KEY_LENGTH];
 /* Pointer to this device */
 static struct platform_device *tsec;
 
+/* Pointer to this nvhost channel */
+static struct nvhost_channel *channel = NULL;
+
 int tsec_hdcp_create_context(struct hdcp_context_t *hdcp_context)
 {
 	int err = 0;
 	DEFINE_DMA_ATTRS(attrs);
+
+	if (!tsec) {
+		err = -EPROBE_DEFER;
+		goto exit;
+	}
+
 	if (!hdcp_context) {
 		err = -EINVAL;
 		goto exit;
@@ -221,6 +230,12 @@ int tsec_hdcp_free_context(struct hdcp_context_t *hdcp_context)
 {
 	int err = 0;
 	DEFINE_DMA_ATTRS(attrs);
+
+	if (!tsec) {
+		err = -EPROBE_DEFER;
+		goto exit;
+	}
+
 	if (!hdcp_context) {
 		err = -EINVAL;
 		goto exit;
@@ -374,28 +389,31 @@ void tsec_send_method(struct hdcp_context_t *hdcp_context,
 	DEFINE_DMA_ATTRS(attrs);
 	u32 increment_opcode;
 	struct nvhost_device_data *pdata = platform_get_drvdata(tsec);
-	static struct nvhost_channel *channel = NULL;
 	int err;
-	static bool mapped = false;
+
+	 /* Ensure that TSEC is powered through the operation. */
+	err = nvhost_module_busy(tsec);
+	if (err) {
+		nvhost_err(&tsec->dev, "Failed to power-on TSEC\n");
+		return;
+	}
 
 	mutex_lock(&tegra_tsec_lock);
-	if (!mapped) {
+	if (!channel) {
 		err = nvhost_channel_map(pdata, &channel, pdata);
 		if (err) {
 			nvhost_err(&tsec->dev, "Channel map failed\n");
-			mutex_unlock(&tegra_tsec_lock);
-			return;
+			goto exit_idle;
 		}
 
-		id = nvhost_get_syncpt_host_managed(tsec, 0, "tsec_hdcp");
 		if (!id) {
-			nvhost_err(&tsec->dev, "failed to get sync point\n");
-			nvhost_putchannel(channel, 1);
-			mutex_unlock(&tegra_tsec_lock);
-			return;
+			id = nvhost_get_syncpt_host_managed(tsec, 0, "tsec_hdcp");
+			if (!id) {
+				nvhost_err(&tsec->dev, "failed to get sync point\n");
+				nvhost_putchannel(channel, 1);
+				goto exit_idle;
+			}
 		}
-
-		mapped = true;
 	}
 
 	cpuvaddr = dma_alloc_attrs(tsec->dev.parent, HDCP_MTHD_BUF_SIZE,
@@ -403,8 +421,7 @@ void tsec_send_method(struct hdcp_context_t *hdcp_context,
 			__DMA_ATTR(attrs));
 	if (!cpuvaddr) {
 		nvhost_err(&tsec->dev, "Failed to allocate memory\n");
-		mutex_unlock(&tegra_tsec_lock);
-		return;
+		goto exit_idle;
 	}
 
 	memset(cpuvaddr, 0x0, HDCP_MTHD_BUF_SIZE);
@@ -475,7 +492,9 @@ void tsec_send_method(struct hdcp_context_t *hdcp_context,
 	dma_free_attrs(tsec->dev.parent,
 		HDCP_MTHD_BUF_SIZE, cpuvaddr,
 		dma_handle, __DMA_ATTR(attrs));
+exit_idle:
 	mutex_unlock(&tegra_tsec_lock);
+	nvhost_module_idle(tsec);
 }
 
 
@@ -572,7 +591,10 @@ int nvhost_tsec_finalize_poweron(struct platform_device *dev)
 	if (err)
 		return err;
 
-	nvhost_flcn_start(dev, TSEC_RESERVE);
+	nvhost_flcn_irq_mask_set(dev);
+	nvhost_flcn_irq_dest_set(dev);
+	nvhost_flcn_ctxtsw_init(dev);
+
 	if (nvhost_is_210()) {
 		/* Populate DEBUGINFO with gsc carveout address */
 		mc_get_carveout_info(&inf, NULL, pdata->carveout_idx);
@@ -582,8 +604,8 @@ int nvhost_tsec_finalize_poweron(struct platform_device *dev)
 		host1x_writel(dev, flcn_debuginfo_r(), co_data_base_addr);
 	}
 
-	nvhost_flcn_irq_mask_set(dev);
-	nvhost_flcn_ctxtsw_init(dev);
+	nvhost_flcn_start(dev, TSEC_RESERVE);
+
 	err = tsec_load_kfuse(dev);
 	if (err)
 		return err;
@@ -738,6 +760,13 @@ int nvhost_tsec_prepare_poweroff(struct platform_device *dev)
 	if (m)
 		m->is_booted = false;
 
+	mutex_lock(&tegra_tsec_lock);
+	if (channel) {
+		nvhost_putchannel(channel, 1);
+		channel = NULL;
+	}
+	mutex_unlock(&tegra_tsec_lock);
+
 	return 0;
 }
 
@@ -781,6 +810,7 @@ static int tsec_probe(struct platform_device *dev)
 	struct nvhost_device_data *pdata = NULL;
 	u32 carveout_addr;
 	u32 carveout_size;
+	DEFINE_DMA_ATTRS(attrs);
 
 	if (dev->dev.of_node) {
 		const struct of_device_id *match;
@@ -800,10 +830,10 @@ static int tsec_probe(struct platform_device *dev)
 	pdata->pdev = dev;
 	mutex_init(&pdata->lock);
 	platform_set_drvdata(dev, pdata);
+	dma_set_mask_and_coherent(&dev->dev, DMA_BIT_MASK(39));
 
 	node = of_get_child_by_name(dev->dev.of_node, "carveout");
 	if (node) {
-		DEFINE_DMA_ATTRS(attrs);
 		/* This is currently used only in T124. carveout_addr and
 		 * carveout_size are 32 bit. */
 		err = of_property_read_u32(node, "carveout_addr",
@@ -837,12 +867,25 @@ static int tsec_probe(struct platform_device *dev)
 
 	err = nvhost_client_device_get_resources(dev);
 	if (err)
-		return err;
+		goto fail;
 	if (!tsec)
 		tsec = dev;
-	nvhost_module_init(dev);
+
+	if (nvhost_module_init(dev)) {
+		dev_err(&dev->dev, "nvhost_module_init failed\n");
+		err = -EAGAIN;
+		goto fail;
+	}
 
 	err = nvhost_client_device_init(dev);
+
+fail:
+	if (err)
+		dma_unmap_single_attrs(&dev->dev,
+				       pdata->carveout_addr,
+				       pdata->carveout_size,
+				       DMA_TO_DEVICE,
+				       __DMA_ATTR(attrs));
 
 	return err;
 }
