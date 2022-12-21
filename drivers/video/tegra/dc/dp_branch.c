@@ -217,10 +217,13 @@ static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 		}
 	}
 
-	/* Check if it's STMicroelectronics based */
+	/* Check if it's STMicroelectronics or Realtek based */
 	if (!(branch_oui[0] == 0x00 &&
 	      branch_oui[1] == 0x80 &&
-	      branch_oui[2] == 0xe1))
+	      branch_oui[2] == 0xe1) &&
+		!(branch_oui[0] == 0x00 &&
+	      branch_oui[1] == 0xe0 &&
+	      branch_oui[2] == 0x4c))
 	{
 		dev_warn(&dp->dc->ndev->dev,
 			"dp: cec: not compatible oui (%02X-%02X-%02X)!\n",

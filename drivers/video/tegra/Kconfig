@@ -230,11 +230,12 @@ config TEGRA_DP
 	  Say Y here to enable eDP panel.
 
 config TEGRA_DP_BRANCH_STDP2550
-	bool "Enable DP branch STDP2550 support."
+	bool "Enable DP branch STDP2550/RTD2172N support."
 	depends on TEGRA_DP && MEDIA_CEC
 	default n
 	help
-	  Say Y here to enable the DP branch MegaChips STDP2550 support.
+	  Say Y here to enable the DP branch MegaChips STDP2550 and Realtek
+	  RTD2172N support.
 	  Disabled by default. STDP series are DP2HDMI adapters that support
 	  CEC communications over DP via branch DPCD registers.
 
