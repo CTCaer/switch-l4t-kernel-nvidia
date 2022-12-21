@@ -247,6 +247,7 @@ err:
 }
 EXPORT_SYMBOL(tegra_hdmi_setup_hda_presence);
 
+#ifdef CONFIG_TEGRA_HDMI2_0
 static void tegra_hdmi_audio_infoframe(struct tegra_dc_hda_data *hda)
 {
 	if ((hda->sink == TEGRA_DC_OUT_HDMI) &&
@@ -328,6 +329,7 @@ static void tegra_hdmi_audio_acr(u32 audio_freq, struct tegra_dc_hda_data *hda)
 				NV_SOR_HDMI_AUDIO_N_RESET_DEASSERT);
 #undef GET_AVAL
 }
+#endif
 
 static void tegra_hda_audio_config(u32 audio_freq, u32 audio_src,
 					struct tegra_dc_hda_data *hda)
@@ -379,10 +381,12 @@ static void tegra_hda_audio_config(u32 audio_freq, u32 audio_src,
 			NV_SOR_DP_OUTPUT_CHANNEL_STATUS2_OVERRIDE_DIS);
 	}
 
+#ifdef CONFIG_TEGRA_HDMI2_0
 	if (hda->sink == TEGRA_DC_OUT_HDMI) {
 		tegra_hdmi_audio_acr(audio_freq, hda);
 		tegra_hdmi_audio_infoframe(hda);
 	}
+#endif
 }
 
 /* Applicable for dp too, func name still uses hdmi as per generic hda driver */
