@@ -518,10 +518,10 @@ static inline void tegra_sor_write_field(struct tegra_dc_sor_data *sor,
 static inline void tegra_sor_clk_enable(struct tegra_dc_sor_data *sor)
 {
 	if (tegra_dc_is_nvdisplay()) {
-		if (tegra_platform_is_silicon() && tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_prepare_enable(sor->ref_clk);
 	} else {
-		if (tegra_platform_is_silicon() || tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_prepare_enable(sor->sor_clk);
 	}
 }
@@ -529,10 +529,10 @@ static inline void tegra_sor_clk_enable(struct tegra_dc_sor_data *sor)
 static inline void tegra_sor_clk_disable(struct tegra_dc_sor_data *sor)
 {
 	if (tegra_dc_is_nvdisplay()) {
-		if (tegra_platform_is_silicon() && tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_disable_unprepare(sor->ref_clk);
 	} else {
-		if (tegra_platform_is_silicon() || tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_disable_unprepare(sor->sor_clk);
 	}
 }
@@ -540,10 +540,10 @@ static inline void tegra_sor_clk_disable(struct tegra_dc_sor_data *sor)
 static inline void tegra_sor_safe_clk_enable(struct tegra_dc_sor_data *sor)
 {
 	if (tegra_dc_is_nvdisplay()) {
-		if (tegra_platform_is_silicon() && tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_prepare_enable(sor->safe_clk);
 	} else {
-		if (tegra_platform_is_silicon() || tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_prepare_enable(sor->safe_clk);
 	}
 }
@@ -551,10 +551,10 @@ static inline void tegra_sor_safe_clk_enable(struct tegra_dc_sor_data *sor)
 static inline void tegra_sor_safe_clk_disable(struct tegra_dc_sor_data *sor)
 {
 	if (tegra_dc_is_nvdisplay()) {
-		if (tegra_platform_is_silicon() && tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_disable_unprepare(sor->safe_clk);
 	} else {
-		if (tegra_platform_is_silicon() || tegra_bpmp_running())
+		if (tegra_platform_is_silicon())
 			clk_disable_unprepare(sor->safe_clk);
 	}
 }
@@ -562,12 +562,6 @@ static inline void tegra_sor_safe_clk_disable(struct tegra_dc_sor_data *sor)
 static inline int tegra_get_sor_reset_ctrl(struct tegra_dc_sor_data *sor,
 	struct device_node *np_sor, const char *res_name)
 {
-	if (tegra_dc_is_nvdisplay()) {
-		/* Use only if bpmp is enabled */
-		if (!tegra_bpmp_running())
-			return 0;
-	}
-
 	sor->rst = of_reset_control_get(np_sor, res_name);
 	if (IS_ERR(sor->rst)) {
 		dev_err(&sor->dc->ndev->dev,
