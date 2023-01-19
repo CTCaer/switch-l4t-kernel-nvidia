@@ -1,7 +1,7 @@
 /*
  * dp_branch.c: DP Branch device communication functions.
  *
- * Copyright (c) 2021, CTCaer.
+ * Copyright (c) 2021-2022, CTCaer.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and

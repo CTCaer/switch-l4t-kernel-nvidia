@@ -2,6 +2,7 @@
  * bandwidth.c: Functions required for dc bandwidth calculations.
  *
  * Copyright (c) 2010-2019, NVIDIA CORPORATION, All rights reserved.
+ * Copyright (c) 2021, CTCaer
  *
  * Author: Jon Mayo <jmayo@nvidia.com>
  *
