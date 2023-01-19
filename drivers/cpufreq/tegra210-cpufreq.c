@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2016-2019, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2022-2023, CTCaer
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -62,14 +63,14 @@ struct tegra_cpufreq_priv {
 static struct tegra_cpufreq_priv *tfreq_priv;
 
 static struct kobject *cpufreq_kobject;
-static bool overclock_enabled = false;
+static bool bypass_safe_max = false;
 static unsigned int max_freq;
 static unsigned int safe_max_freq;
 
 static ssize_t overclock_show(struct kobject *kobj, struct kobj_attribute *attr,
 					   char *buf)
 {
-	return sprintf(buf, "%d\n", overclock_enabled);
+	return sprintf(buf, "%d\n", bypass_safe_max);
 }
 
 static ssize_t overclock_store(struct kobject *kobj, struct kobj_attribute *attr,
@@ -80,8 +81,8 @@ static ssize_t overclock_store(struct kobject *kobj, struct kobj_attribute *attr
 	ret = sscanf(buf, "%d", &enable);
 	if (ret != 1 || enable < 0 || enable > 1)
 		return -EINVAL;
-	
-	overclock_enabled = enable;
+
+	bypass_safe_max = enable;
 
 	return count;
 }
@@ -136,7 +137,7 @@ static int tegra_boundaries_policy_notifier(struct notifier_block *nb,
 	policy->min = max(policy->min, qmin);
 	policy->max = min(policy->max, qmax);
 
-	if (!overclock_enabled && safe_max_freq)
+	if (!bypass_safe_max && safe_max_freq)
 		policy->max = min(safe_max_freq, policy->max);
 
 	if (max_freq)
@@ -295,7 +296,7 @@ static int cpufreq_table_make_from_dt(void)
 
 		ret = sysfs_create_file(cpufreq_kobject, &overclock_attribute.attr);
 		if (ret)
-			return -ENOMEM;	
+			return -ENOMEM;
 	} else {
 		safe_max_freq = 0;
 	}
@@ -310,6 +311,9 @@ static int cpufreq_table_make_from_dt(void)
 
 	/* Fill in scaling table data */
 	for (i = 0, j = 0; j < freqs_num; j++) {
+		/* Check if frequency is out of bounds */
+		if (max_freq && freqs[j] > max_freq)
+			break;
 		if (clk_round_rate(tfreq_priv->cpu_clk, freqs[j] * 1000) > 0) {
 			ftbl[i].driver_data = 0;
 			ftbl[i].frequency = freqs[j];
