@@ -1,7 +1,7 @@
 /*
  * panel-s-720p-7-0.c: Panel driver for Samsung AMS699VC01 panel.
  *
- * Copyright (c) 2022, CTCaer.
+ * Copyright (c) 2022-2023, CTCaer.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -31,15 +31,34 @@
 #define DCS_PRIV_SM_SET_COLOR_MODE	0xA0
 
 /* DCS command values */
-#define DCS_SM_COLOR_MODE_BASIC		0x03
-#define DCS_SM_COLOR_MODE_WASHED	0x45
-#define DCS_SM_COLOR_MODE_NATURAL	0x23
-#define DCS_SM_COLOR_MODE_VIVID		0x65
-#define DCS_SM_COLOR_MODE_NIGHT0	0x43
-#define DCS_SM_COLOR_MODE_NIGHT1	0x15
-#define DCS_SM_COLOR_MODE_NIGHT2	0x35
-#define DCS_SM_COLOR_MODE_NIGHT3	0x75
-#define DCS_SM_COLOR_MODE_DEFAULT	DCS_SM_COLOR_MODE_NATURAL
+static u8 color_modes[] = {
+	0x00, /* Disabled - Saturated */
+	0x45, /* Washed out */
+	0x03, /* Basic */
+	0x23, /* Natural */
+	0x65, /* Vivid */
+	0x43, /* Night Washed out */
+	0x15, /* Night Basic */
+	0x35, /* Night Natural */
+	0x75  /* Night Vivid */
+};
+
+enum {
+	COLOR_MODE_DISABLED 	= 0,
+	COLOR_MODE_WASHED	= 1,
+	COLOR_MODE_BASIC	= 2,
+	COLOR_MODE_NATURAL	= 3,
+	COLOR_MODE_VIVID	= 4,
+
+	/* Night modes for above */
+	COLOR_MODE_NIGHT0	= 5,
+	COLOR_MODE_NIGHT1	= 6,
+	COLOR_MODE_NIGHT2	= 7,
+	COLOR_MODE_NIGHT3	= 8
+};
+
+#define COLOR_MODE_MAX		COLOR_MODE_NIGHT3
+#define COLOR_MODE_DEFAULT	COLOR_MODE_NATURAL
 
 /* Values used for the panel registers */
 #define DCS_DEV_BRIGHTNESS_MIN		0
@@ -55,7 +74,7 @@
 
 #define DSI_VIDEO_TYPE_VIDEO_MODE	0x1
 
-static u8   color_mode = DCS_SM_COLOR_MODE_DEFAULT;
+static u8   color_mode = COLOR_MODE_DEFAULT;
 static bool color_mode_set = false;
 static u16  gpio_panel_rst = -1;
 
@@ -89,7 +108,10 @@ static int dcs_set_color_mode(struct tegra_dc *dc,
 {
 	int err;
 
-	color_mode_cmd.sp_len_dly.sp.data1 = cmode;
+	if (cmode > COLOR_MODE_MAX)
+		cmode = COLOR_MODE_DEFAULT;
+
+	color_mode_cmd.sp_len_dly.sp.data1 = color_modes[cmode];
 
 	err = dcs_send_cmd(dc, dsi, &color_mode_cmd);
 	if (err < 0) {
@@ -145,7 +167,7 @@ static int dcs_bl_update_status(struct backlight_device *bd)
 
 	/* Restore color mode in case of panel init */
 	if (!color_mode_set) {
-		if (color_mode == DCS_SM_COLOR_MODE_DEFAULT) {
+		if (color_mode == COLOR_MODE_DEFAULT) {
 			color_mode_set = true;
 			return 0;
 		}
@@ -190,7 +212,7 @@ static struct backlight_device *create_dcs_backlight(
 static ssize_t dcs_cm_show(struct device *dev,
 			struct device_attribute *attr, char *buf)
 {
-	return sprintf(buf, "0x%02X\n", color_mode);
+	return sprintf(buf, "%d\n", color_mode);
 }
 
 static ssize_t dcs_cm_store(struct device *dev,
@@ -209,7 +231,7 @@ static ssize_t dcs_cm_store(struct device *dev,
 		return -EPERM;
 	}
 
-	err = kstrtoul(buf, 16, &val);
+	err = kstrtoul(buf, 10, &val);
 	if (err)
 		return err;
 
