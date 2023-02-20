@@ -1358,7 +1358,7 @@ static int pwm_fan_probe(struct platform_device *pdev)
 	hwmon = devm_hwmon_device_register_with_groups(&pdev->dev, "tegra_pwmfan", fan_data, pwm_fan_groups);
 	if (IS_ERR(hwmon)) {
 		dev_err(&pdev->dev, "Failed to register hwmon device\n");
-			pwm_disable(fan_data->pwm_dev);
+		pwm_disable(fan_data->pwm_dev);
 		err = PTR_ERR(hwmon);
 		goto hwmon_fail;
 	}
