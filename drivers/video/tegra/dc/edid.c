@@ -1236,10 +1236,9 @@ int tegra_dc_edid_blob(struct tegra_dc *dc, struct i2c_msg *msgs, int num)
 				"nvidia,edid", pmsg->buf, len);
 
 			if (status) {
-				dev_err(&dc->ndev->dev,
-					"Failed to read EDID blob from DT"
-					" addr:%d, size:%d\n",
-					pmsg->addr, len);
+				dev_warn(&dc->ndev->dev,
+					"Could not read EDID blob from DT,"
+					" size:%d\n", len);
 				return status;
 			}
 		}
