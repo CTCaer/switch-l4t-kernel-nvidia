@@ -1,7 +1,7 @@
 /*
  * dp_branch.c: DP Branch device communication functions.
  *
- * Copyright (c) 2021-2022, CTCaer.
+ * Copyright (c) 2021-2023, CTCaer.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -165,11 +165,12 @@ static int dpb_stm_cec_write(struct tegra_dc_dp_data *dp,
 static int dpb_stm_cec_set_logical_address(struct tegra_dc_dp_data *dp,
 					        u8 address)
 {
+	struct tegra_dp_branch_data *data = &dp->branch_data;
 	int ret = 0;
 	u8 dpcd_data = 0;
 
-	/* Exit if disconnected but return success to framework */
-	if (!dp->dc->connected)
+	/* Exit if disconnected/incompatible but return success to framework */
+	if (!dp->dc->connected || data->branch_incompatible)
 		return 0;
 
 	if (address == CEC_LOG_ADDR_INVALID)
@@ -197,14 +198,19 @@ static int dpb_stm_cec_set_logical_address(struct tegra_dc_dp_data *dp,
 static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 					  bool enable)
 {
-	u32 i;
-	int ret = 0;
-	u8 dpcd_data = 0;
+	struct tegra_dp_branch_data *data = &dp->branch_data;
 	u8 branch_oui[3] = {0};
+	u8 dpcd_data = 0;
+	int ret = 0;
+	u32 i;
 
 	/* Exit if disconnected but return success to framework */
 	if (!dp->dc->connected)
 		return 0;
+
+	/* Exit if already checked and incompatible */
+	if (data->branch_incompatible)
+		return -ENODEV;
 
 	/* Check if supported device */
 	for (i = 0; i < sizeof(branch_oui); i++) {
@@ -225,8 +231,9 @@ static int dpb_stm_cec_enable(struct tegra_dc_dp_data *dp,
 	      branch_oui[1] == 0xe0 &&
 	      branch_oui[2] == 0x4c))
 	{
+		data->branch_incompatible = true;
 		dev_warn(&dp->dc->ndev->dev,
-			"dp: cec: not compatible oui (%02X-%02X-%02X)!\n",
+			"dp: cec: oui not compatible (%02X-%02X-%02X)!\n",
 			branch_oui[0], branch_oui[1], branch_oui[2]);
 		return -ENODEV;
 	}
@@ -294,7 +301,7 @@ static int dpb_stm_cec_adap_transmit(struct cec_adapter *adap, u8 attempts,
 {
 	struct tegra_dp_branch_data *data = adap->priv;
 
-	if (!data->dp->dc->connected)
+	if (!data->dp->dc->connected || data->branch_incompatible)
 		return -ENODEV;
 
 	data->cec_tx_attempts = attempts;
@@ -363,7 +370,7 @@ int tegra_dp_branch_notify_event(struct tegra_dc_dp_data *dp)
 #ifdef CONFIG_TEGRA_DP_BRANCH_STDP2550
 	struct tegra_dp_branch_data *data = &dp->branch_data;
 
-	if (!data->branch_registered)
+	if (!data->branch_registered || data->branch_incompatible)
 		return -ENODEV;
 
 	schedule_work(&data->cec_rx_work);
@@ -434,4 +441,5 @@ void tegra_dp_branch_unregister(struct tegra_dc_dp_data *dp)
 	}
 
 	data->branch_registered = false;
+	data->branch_incompatible = false;
 }

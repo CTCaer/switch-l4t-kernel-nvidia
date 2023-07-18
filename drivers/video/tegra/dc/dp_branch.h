@@ -1,7 +1,7 @@
 /*
  * dp_branch.h: DP Branch device communication definitions.
  *
- * Copyright (c) 2021, CTCaer.
+ * Copyright (c) 2021-2023, CTCaer.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -27,6 +27,7 @@
 struct tegra_dp_branch_data {
 	struct tegra_dc_dp_data *dp;
 	bool branch_registered;
+	bool branch_incompatible;
 
 	struct cec_adapter *adap;
 	struct work_struct cec_rx_work;
