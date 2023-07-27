@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2014-2019, NVIDIA CORPORATION. All rights reserved.
- * Copyright (c) 2021, CTCaer
+ * Copyright (c) 2021-2023, CTCaer.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -31,7 +31,10 @@
 #define LA_DRAM_WIDTH_BITS				64
 #define LA_DISP_CATCHUP_FACTOR_FP			1100
 #define MC_MAX_FREQ_MHZ					533
-#define MAX_GRANT_DEC					511
+#define EMC_MIN_FREQ_KHZ				25000
+#define EMC_MAX_FREQ_KHZ				2132000
+#define LPDDR4_LO_GRANT_DEC_FP				176   /* 0.017586255446 */
+#define LPDDR4_HI_GRANT_DEC_FP				14998 /* 1.499755859375 */
 
 #define EXP_TIME_EMCCLKS_FP				88000
 #define MAX_LA_NSEC					7650
@@ -106,11 +109,8 @@ static struct la_client_info t21x_la_info_array[] = {
 	LA(0, 0, DC_3,		0 : 0, MAX_ID, false, 0, 0)
 };
 
-static unsigned int emc_min_freq_mhz_fp;
-static unsigned int emc_min_freq_mhz;
-static unsigned int emc_max_freq_mhz;
-static unsigned int hi_gd_fp;
-static unsigned int lo_gd_fp;
+static unsigned int emc_min_freq_khz;
+static unsigned int emc_max_freq_khz;
 static unsigned int hi_gd_fpa;
 static unsigned int lo_gd_fpa;
 static unsigned int low_freq_bw;
@@ -196,7 +196,7 @@ static void save_ptsa(void)
  */
 static u32 get_mem_bw_mbps(u32 dram_freq)
 {
-	return dram_freq * 16;
+	return dram_freq * 2 * LA_DRAM_WIDTH_BITS / 8;
 }
 
 static bool is_t210b01_soc(void)
@@ -244,7 +244,7 @@ static void t21x_init_ptsa(void)
 	la_debug("mc clk_rate = %u MHz", mc_freq_mhz);
 
 	/* compute initial value for grant dec */
-	gd_fpa = (LA_FP_TO_FPA(lo_gd_fp) * emc_freq_mhz) / emc_min_freq_mhz;
+	gd_fpa = LA_REAL_TO_FP((lo_gd_fpa * emc_freq_mhz)) / emc_min_freq_khz;
 	if (gd_fpa >= LA_REAL_TO_FPA(1)) {
 		gd_int = 1;
 		gd_fpa -= LA_REAL_TO_FPA(1);
@@ -839,27 +839,41 @@ void tegra_la_get_t21x_specific(struct la_chip_specific *cs_la)
 	cs_la->resume = la_resume;
 	cs = cs_la;
 
-	if (ON_LPDDR4()) {
-		emc_min_freq_mhz_fp = 25000;
-		emc_min_freq_mhz = 25;
-		emc_max_freq_mhz = 2132;
-		hi_gd_fp = 1500;
-		lo_gd_fp = 18;
-		hi_gd_fpa = 14998;
-		lo_gd_fpa = 176;
+	if (cs_la->ptsa_rework && ON_LPDDR4()) {
+		struct clk *emc_clk = clk_get_sys("tegra_emc", "emc");
+		long emc_max_rate = clk_round_rate(emc_clk, LONG_MAX) / 1000;
+		emc_min_freq_khz = EMC_MIN_FREQ_KHZ;
+		emc_max_freq_khz = EMC_MAX_FREQ_KHZ;
+		hi_gd_fpa = LPDDR4_HI_GRANT_DEC_FP;
+		lo_gd_fpa = LPDDR4_LO_GRANT_DEC_FP;
 		dda_div = 1;
+
+		if (emc_max_rate > 2133000) {
+			emc_max_freq_khz = emc_max_rate;
+			lo_gd_fpa = (emc_min_freq_khz / 2) * hi_gd_fpa * 10 /
+				    (emc_max_freq_khz / 2);
+			if ((lo_gd_fpa % 10) >= 5)
+				lo_gd_fpa = lo_gd_fpa / 10 + 1;
+			else
+				lo_gd_fpa = lo_gd_fpa / 10;
+		}
 	} else {
-		emc_min_freq_mhz_fp = 12500;
-		emc_min_freq_mhz = 12;
-		emc_max_freq_mhz = 1200;
-		hi_gd_fp = 2000;
-		lo_gd_fp = 21;
-		hi_gd_fpa = 19998;
-		lo_gd_fpa = 208;
-		dda_div = 2;
+		if (ON_LPDDR4()) {
+			emc_min_freq_khz = EMC_MIN_FREQ_KHZ;
+			emc_max_freq_khz = EMC_MAX_FREQ_KHZ;
+			hi_gd_fpa = LPDDR4_HI_GRANT_DEC_FP;
+			lo_gd_fpa = LPDDR4_LO_GRANT_DEC_FP;
+			dda_div = 1;
+		} else {
+			emc_min_freq_khz = EMC_MIN_FREQ_KHZ / 2;
+			emc_max_freq_khz = 1200000;
+			hi_gd_fpa = 19998;
+			lo_gd_fpa = 208;
+			dda_div = 2;
+		}
 	}
 
-	low_freq_bw = emc_min_freq_mhz_fp * 2 * LA_DRAM_WIDTH_BITS / 8;
+	low_freq_bw = get_mem_bw_mbps(emc_min_freq_khz);
 	low_freq_bw /= 1000;
 	tegra_la_disp_clients_info = cs_la->disp_clients;
 

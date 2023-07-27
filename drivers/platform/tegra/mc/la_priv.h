@@ -2,6 +2,7 @@
  * arch/arm/mach-tegra/la_priv.h
  *
  * Copyright (C) 2012-2018, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2023, CTCaer.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -594,6 +595,7 @@ struct la_chip_specific {
 	struct la_to_dc_params la_params;
 	bool disable_disp_ptsa;
 	bool disable_bbc_ptsa;
+	bool ptsa_rework;
 
 	void (*init_ptsa)(void);
 	void (*update_display_ptsa_rate)(unsigned int *disp_bw_array);
