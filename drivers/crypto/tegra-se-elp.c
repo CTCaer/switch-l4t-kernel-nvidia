@@ -5,6 +5,7 @@
  * Support for Tegra Security Engine Elliptic crypto algorithms.
  *
  * Copyright (c) 2015-2021, NVIDIA CORPORATION.  All rights reserved.
+ * Copyright (c) 2023, CTCaer.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms and conditions of the GNU General Public License,
@@ -141,7 +142,6 @@ struct tegra_se_elp_dev {
 	struct completion complete;
 	struct tegra_se_pka1_slot *slot_list;
 	const struct tegra_se_elp_chipdata *chipdata;
-	u32 *rdata;
 	/* Mutex lock to protect HW */
 	struct mutex hw_lock;
 };
@@ -478,26 +478,7 @@ static int tegra_se_pka1_init_key_slot(struct tegra_se_elp_dev *se_dev)
 	return 0;
 }
 
-static u32 tegra_se_check_trng_op(struct tegra_se_elp_dev *se_dev)
-{
-	u32 trng_val;
-	u32 val = se_elp_readl(se_dev, PKA1,
-			       TEGRA_SE_PKA1_TRNG_STATUS_OFFSET);
-
-	trng_val = TEGRA_SE_PKA1_TRNG_STATUS_SECURE(ELP_TRUE) |
-			TEGRA_SE_PKA1_TRNG_STATUS_NONCE(ELP_FALSE) |
-			TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE) |
-			TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(
-						TRNG_LAST_RESEED_HOST);
-	if ((val & trng_val) ||
-	    (val & TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED
-					(TRNG_LAST_RESEED_RESEED)))
-		return 0;
-
-	return -EFAULT;
-}
-
-static u32 tegra_se_set_trng_op(struct tegra_se_elp_dev *se_dev)
+static int tegra_se_set_trng_op(struct tegra_se_elp_dev *se_dev)
 {
 	u32 val, i = 0;
 
@@ -523,6 +504,83 @@ static u32 tegra_se_set_trng_op(struct tegra_se_elp_dev *se_dev)
 	} while (!(val & TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE)));
 
 	return 0;
+}
+
+static u32 tegra_se_set_trng_nonce_op(struct tegra_se_elp_dev *se_dev)
+{
+	u32 val, i = 0;
+
+	/* need to write twice, switch secure/promiscuous
+	 * mode would reset other bits
+	 */
+	val = TEGRA_SE_PKA1_TRNG_SMODE_SECURE(ELP_ENABLE) |
+	      TEGRA_SE_PKA1_TRNG_SMODE_NONCE(ELP_ENABLE) |
+	      TEGRA_SE_PKA1_TRNG_SMODE_MAX_REJECTS(10);
+	se_elp_writel(se_dev, PKA1, val, TEGRA_SE_PKA1_TRNG_SMODE_OFFSET);
+	se_elp_writel(se_dev, PKA1, val, TEGRA_SE_PKA1_TRNG_SMODE_OFFSET);
+
+	/* Reseed nonce */
+	se_elp_writel(se_dev, PKA1,
+		      TEGRA_SE_PKA1_TRNG_CTRL_CMD(PKA1_TRNG_CMD_NONCE_RESEED),
+		      TEGRA_SE_PKA1_TRNG_CTRL_OFFSET);
+
+	/* Poll seeded status */
+	do {
+		if (i > PKA1_TIMEOUT) {
+			dev_err(se_dev->dev,
+				"Poll TRNG seeded status timed out\n");
+			return -ETIMEDOUT;
+		}
+		udelay(1);
+		val = se_elp_readl(se_dev, PKA1,
+				   TEGRA_SE_PKA1_TRNG_STATUS_OFFSET);
+		i++;
+	} while (!(val & TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE)));
+
+	return 0;
+}
+
+static int tegra_se_check_trng_op(struct tegra_se_elp_dev *se_dev)
+{
+	int res = 0;
+	u32 trng_val, mask;
+	u32 val = se_elp_readl(se_dev, PKA1,
+			       TEGRA_SE_PKA1_TRNG_STATUS_OFFSET);
+
+	/* If nonce is selected check if properly seeded */
+	mask = TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE) |
+	       TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(TRNG_LAST_RESEED_UNSEEDED);
+	trng_val = TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE) |
+		   TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(TRNG_LAST_RESEED_NONCE);
+
+	if (val & TEGRA_SE_PKA1_TRNG_STATUS_NONCE(ELP_TRUE)) {
+		/* Configure nonce op */
+		if ((val & mask) != trng_val)
+			res = tegra_se_set_trng_nonce_op(se_dev);
+		return res;
+	}
+
+	/* If not nonce, check if properly secured and seeded */
+	mask = TEGRA_SE_PKA1_TRNG_STATUS_SECURE(ELP_TRUE) |
+	       TEGRA_SE_PKA1_TRNG_STATUS_SEEDED(ELP_TRUE);
+
+	if ((val & mask) != mask)
+		res = -EFAULT;
+
+	/* Check if seeded by host or device */
+	mask = TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(TRNG_LAST_RESEED_UNSEEDED);
+	mask &= val;
+	if (mask !=
+		TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(TRNG_LAST_RESEED_HOST) ||
+	    mask !=
+	        TEGRA_SE_PKA1_TRNG_STATUS_LAST_RESEED(TRNG_LAST_RESEED_I_RESEED))
+	        res = -EFAULT;
+
+	/* Configure op */
+	if (res)
+		res = tegra_se_set_trng_op(se_dev);
+
+	return res;
 }
 
 static void tegra_se_restart_pka1_mutex_wdt(struct tegra_se_elp_dev *se_dev)
@@ -4027,11 +4085,11 @@ static int tegra_se_elp_trng_get_random(struct crypto_rng *tfm,
 		goto clk_dis;
 	}
 
-	tegra_se_set_pka1_op_ready(se_dev);
-
 	for (i = 0; i <= num_blocks; i++) {
+		tegra_se_set_pka1_op_ready(se_dev);
+
 		se_elp_writel(se_dev, PKA1,
-			TEGRA_SE_PKA1_TRNG_CTRL_CMD(ELP_ENABLE),
+			TEGRA_SE_PKA1_TRNG_CTRL_CMD(PKA1_TRNG_CMD_GEN_RAN_NUM),
 			TEGRA_SE_PKA1_TRNG_CTRL_OFFSET);
 
 		ret = tegra_se_check_pka1_op_done(se_dev);
@@ -4514,15 +4572,6 @@ static int tegra_se_elp_probe(struct platform_device *pdev)
 		return err;
 	}
 
-	if (se_dev->chipdata->rng1_supported) {
-		se_dev->rdata = devm_kzalloc(se_dev->dev,
-					     sizeof(u32) * 4, GFP_KERNEL);
-		if (!se_dev->rdata) {
-			err = -ENOMEM;
-			goto clk_dis;
-		}
-	}
-
 	elp_dev = se_dev;
 
 	err = tegra_se_pka1_init_key_slot(se_dev);
@@ -4534,8 +4583,6 @@ static int tegra_se_elp_probe(struct platform_device *pdev)
 	init_completion(&se_dev->complete);
 
 	err = tegra_se_check_trng_op(se_dev);
-	if (err)
-		err = tegra_se_set_trng_op(se_dev);
 	if (err) {
 		dev_err(se_dev->dev, "set_trng_op Failed\n");
 		goto clk_dis;
