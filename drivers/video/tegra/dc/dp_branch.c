@@ -184,14 +184,17 @@ static int dpb_stm_cec_set_logical_address(struct tegra_dc_dp_data *dp,
 				    &dpcd_data);
 	if (ret) {
 		dev_err(&dp->dc->ndev->dev, "dp: cec: failed to read config!\n");
+		data->branch_incompatible = true;
 		return ret;
 	}
 	dpcd_data &= ~NV_DPCD_BRANCH_STDP_CEC_CTRL_LOGICAL_ADDR_MASK;
 	dpcd_data |= address;
 	ret = tegra_dc_dp_dpcd_write(dp, NV_DPCD_BRANCH_STDP_CEC_CTRL,
 				     dpcd_data);
-	if (ret)
+	if (ret) {
 		dev_err(&dp->dc->ndev->dev, "dp: cec: failed to set la!\n");
+		data->branch_incompatible = true;
+	}
 	return ret;
 }
 
@@ -326,6 +329,9 @@ static void dpb_stm_cec_tx_worker(struct work_struct *work)
 						cec_tx_work);
 	int ret = 0;
 	int i;
+
+	if (!data->dp->dc->connected || data->branch_incompatible)
+		return;
 
 	/* Try to transmit */
 	for (i = 0; i < data->cec_tx_attempts; i++) {
